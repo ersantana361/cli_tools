@@ -1,6 +1,7 @@
-# PDF Utilities
 
-This repository contains two Python scripts for working with PDF files using `pdfminer`. These scripts allow you to extract text from a specific page in a PDF or search for a keyword within all PDF files in a directory, extracting the paragraph containing the keyword.
+# PDF and YouTube Utilities
+
+This repository contains Python scripts for working with PDF files and YouTube video transcripts. You can extract text from a specific page in a PDF, search for a keyword within all PDF files in a directory, or copy the transcript of a YouTube video to your clipboard.
 
 ## Scripts
 
@@ -42,6 +43,26 @@ python search_in_pdf.py ./documents "CQRS"
 - Recursively searches all PDFs in the specified directory.
 - Extracts the paragraph surrounding the keyword.
 - Displays the page number and the extracted paragraph for each occurrence.
+
+### 3. `youtube_transcript.py`
+This script fetches the transcript of a YouTube video and copies it to your clipboard.
+
+#### Usage:
+```bash
+python youtube_transcript.py <video_id_or_url>
+```
+
+#### Arguments:
+- `<video_id_or_url>`: The ID or URL of the YouTube video.
+
+#### Example:
+```bash
+python youtube_transcript.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+#### Features:
+- Extracts the text transcript of a YouTube video.
+- Copies the transcript directly to your clipboard for easy use.
 
 ## Dependencies
 
