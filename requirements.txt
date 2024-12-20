@@ -1,3 +1,5 @@
 pdfminer.six
 youtube-transcript-api
 pyperclip
+xmltodict
+tabulate

@@ -29,7 +29,7 @@ def search_pdfs_recursively(directory, keyword):
     total_files = sum(1 for _, _, files in os.walk(directory) for file in files if file.endswith(".pdf"))
     
     with tqdm(total=total_files) as pbar:
-        for root, dirs, files in os.walk(directory):
+        for root, _, files in os.walk(directory):
             for file in files:
                 if file.endswith(".pdf"):
                     pdf_path = os.path.join(root, file)
@@ -38,12 +38,11 @@ def search_pdfs_recursively(directory, keyword):
                     try:
                         with open(pdf_path, 'rb') as f:
                             page_num = 0
-                            for page in PDFPage.get_pages(f):
+                            for _ in PDFPage.get_pages(f):
                                 page_num += 1
                                 page_text = extract_text(pdf_path, page_numbers=[page_num - 1])
 
                                 if keyword in page_text:
-                                    # Extract the full paragraph containing the keyword
                                     context = extract_full_paragraph(page_text, keyword)
 
                                     if context:
@@ -73,6 +72,6 @@ if __name__ == "__main__":
     parser.add_argument("keyword", help="Keyword to search for")
     
     args = parser.parse_args()
-    directory = os.path.abspath(args.directory)  # Convert to absolute path
+    directory = os.path.abspath(args.directory)
     search_pdfs_recursively(directory, args.keyword)
 
