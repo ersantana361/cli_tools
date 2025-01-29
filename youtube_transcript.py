@@ -10,12 +10,25 @@ def extract_video_id(url):
         return match.group(1)
     return url
 
+def format_time(seconds_float):
+    seconds = int(seconds_float)
+    minutes, seconds = divmod(seconds, 60)
+    return f"{minutes}:{seconds:02d}"
+
 def fetch_transcript(video_url, language):
     try:
         video_id = extract_video_id(video_url)
+        video_base_url = f"https://youtu.be/{video_id}"
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
 
-        transcript_entries = "\n".join([f"{entry['start']}: {entry['text']}" for entry in transcript])
+        transcript_entries = []
+        for entry in transcript:
+            start_time = entry['start']
+            formatted_time = format_time(start_time)
+            link = f"{video_base_url}?t={int(start_time)}"
+            transcript_entries.append(f"{formatted_time} (Link: {link}): {entry['text']}")
+
+        transcript_entries_text = "\n".join(transcript_entries)
 
         transcript_text = f"""
 Give me a summary from this transcript taken from a youtube video
@@ -31,7 +44,7 @@ Make sure the language used is: {language}.
 Do not add any additional comments, context, or summaries outside the requested output.
 
 [TRANSCRIPT START]
-{transcript_entries}
+{transcript_entries_text}
 [TRANSCRIPT END]
 """
 
@@ -46,3 +59,4 @@ if __name__ == "__main__":
     parser.add_argument('--language', default='en', help="Language code for the transcript (default: en)")
     args = parser.parse_args()
     fetch_transcript(args.video, args.language)
+
