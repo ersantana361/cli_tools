@@ -1,14 +1,37 @@
 import argparse
+import os
 from youtube_transcript_api import YouTubeTranscriptApi
 import pyperclip
 import re
+from googleapiclient.discovery import build
+from dotenv import load_dotenv
+
+load_dotenv()
+YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
 
 def extract_video_id(url):
-    video_id_pattern = r'(?:v=|\/)([0-9A-Za-z_-]{11}).*'
-    match = re.search(video_id_pattern, url)
-    if match:
-        return match.group(1)
+    patterns = [
+        r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+        r'^([0-9A-Za-z_-]{11})$'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
     return url
+
+def get_video_title(video_id):
+    try:
+        youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+        request = youtube.videos().list(
+            part="snippet",
+            id=video_id
+        )
+        response = request.execute()
+        return response['items'][0]['snippet']['title']
+    except Exception as e:
+        print(f"Could not fetch title: {e}")
+        return "Untitled Video"
 
 def format_time(seconds_float):
     seconds = int(seconds_float)
@@ -18,7 +41,9 @@ def format_time(seconds_float):
 def fetch_transcript(video_url, language):
     try:
         video_id = extract_video_id(video_url)
+        video_title = get_video_title(video_id)
         video_base_url = f"https://youtu.be/{video_id}"
+
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
 
         transcript_entries = []
@@ -31,17 +56,49 @@ def fetch_transcript(video_url, language):
         transcript_entries_text = "\n".join(transcript_entries)
 
         transcript_text = f"""
-Give me a summary from this transcript taken from a youtube video
+**Video Analysis Request**
 
-Please analyze the following transcript and provide:
-1. A **summary** of the main ideas discussed in the transcript.
-2. A set of **bullet points** summarizing the general themes or arguments presented.
-3. **Key excerpts with clickable timestamps** that highlight important points or arguments, with links to the respective moments in the video.
+Analyze this YouTube video transcript and structure your response as:
 
-Youtube Link: {video_url}
+### **Introduction**
+- **Title**: [{video_title}]({video_url})
+- **Overview**:
+  A comprehensive explanation of the video's core objectives, structural flow, and key conceptual arcs. Identify how major themes connect and evolve throughout the presentation.
 
-Make sure the language used is: {language}.
-Do not add any additional comments, context, or summaries outside the requested output.
+---
+
+### **Chronological Analysis**
+
+For each significant segment in playback order:
+
+#### **[Section Title]**
+[Timestamp: XX:XX](link)
+1-2 verbatim excerpts from the transcript showcasing critical content, formatted as:
+> *"Exact quoted text from transcript"*
+
+Detailed analysis containing:
+- Technical explanation of concepts/arguments
+- Contextualization within the broader video
+- Significance to the overall subject matter
+- Real-world implications or applications
+- Connections to other segments/themes
+
+---
+
+### **Conclusion**
+Synthesize the video's progression from initial concepts to final takeaways, emphasizing:
+- Key intellectual milestones
+- Practical/theoretical importance
+- Overall learning outcomes
+
+**Requirements**:
+- Maintain strict chronological order with timestamps
+- Use 3-7 substantial segments based on content density
+- Blend direct quotes with deep technical analysis
+- Explain specialized terms/concepts contextually
+- Output language: {language}
+
+YouTube Link: {video_url}
 
 [TRANSCRIPT START]
 {transcript_entries_text}
@@ -49,14 +106,13 @@ Do not add any additional comments, context, or summaries outside the requested 
 """
 
         pyperclip.copy(transcript_text)
-        print("Transcript copied to clipboard.")
+        print("Transcript prompt copied to clipboard.")
     except Exception as e:
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fetch YouTube video transcript and copy it to clipboard.")
+    parser = argparse.ArgumentParser(description="Generate video analysis prompt with transcript")
     parser.add_argument('video', help="YouTube video ID or URL")
-    parser.add_argument('--language', default='en', help="Language code for the transcript (default: en)")
+    parser.add_argument('--language', default='en', help="Language code (default: en)")
     args = parser.parse_args()
     fetch_transcript(args.video, args.language)
-

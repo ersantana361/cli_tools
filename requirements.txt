@@ -3,3 +3,5 @@ youtube-transcript-api
 pyperclip
 xmltodict
 tabulate
+google-api-python-client
+python-dotenv
