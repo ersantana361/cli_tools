@@ -4,6 +4,8 @@ import pyperclip
 import requests
 from github import Github
 from openai import OpenAI as DeepseekClient
+from rich.console import Console
+from rich.markdown import Markdown
 
 # Check for required environment variables
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -144,9 +146,14 @@ def main():
         # Step 3: Generate the formatted description using the diff and analysis
         full_description = generate_description(diff_text, analysis_text)
         
-        # Step 4: Copy the generated description to clipboard
+        # Step 4: Copy the generated description to the clipboard
         pyperclip.copy(full_description)
         print("📋 Generated description copied to clipboard!")
+        
+        # Step 5: Print the generated description in the terminal using rich
+        console = Console()
+        md = Markdown(full_description)
+        console.print(md)
     except Exception as e:
         print(f"🚫 Error: {e}")
 
