@@ -74,9 +74,6 @@ You are an assistant that summarizes code changes. Based on the provided code di
 ## Risks? :warning:
 {risks}
 
-### Code Diff:
-{diff_text}
-
 ### Analysis:
 {analysis_text}
 <TEMPLATE_END>
