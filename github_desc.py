@@ -101,7 +101,8 @@ You are an assistant that summarizes code changes. Based on the provided code di
 <TEMPLATE_END>
 
 Fill in the sections appropriately, ensuring that the output is clear and formatted as shown.
-The output should contain only the section described above within <TEMPLATE_START><TEMPLATE_END>
+The output should contain only the section described above within <TEMPLATE_START><TEMPLATE_END>.
+But it should remove the <TEMPLATE_START><TEMPLATE_END>.
 """
     filled_prompt = prompt_template.format(
         title="Enter the PR title here (e.g. Brief title of changes)",
