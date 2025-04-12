@@ -6,6 +6,7 @@ from github import Github
 from rich.console import Console
 from rich.markdown import Markdown
 
+# Import the prompt template and ChatOpenAI using the new modules.
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
@@ -20,7 +21,7 @@ if not DEEPSEEK_API_KEY:
 
 def get_pr_diff(pr_url: str) -> str:
     """
-    Fetches the diff (patch) for a pull request from a private repository.
+    Fetches the diff (patch) for a pull request from a private repository
     Expected PR URL format: https://github.com/{owner}/{repo}/pull/{pr_number}
     """
     print("🔍 Fetching PR diff from GitHub...")
@@ -48,31 +49,28 @@ def get_pr_diff(pr_url: str) -> str:
     return response.text
 
 
-def analyze_diff(diff_text: str, llm: ChatOpenAI) -> str:
+def build_pipeline(llm: ChatOpenAI, target: str):
     """
-    Uses the new runnable chain style to analyze the PR diff.
+    Constructs a sequential pipeline that:
+      1. Analyzes the diff.
+      2. Generates a formatted PR report using the analysis and diff.
+
+    Both steps are built by chaining PromptTemplates with the LLM via the new operator (|).
     """
-    print("🤖 Starting analysis of the diff. This may take a moment...")
+
+    # Define the analysis prompt template.
     analysis_template = (
         "You are a code analysis assistant. Analyze the following diff and summarize your key findings:\n\n"
         "{diff}"
     )
-    analysis_prompt = PromptTemplate(input_variables=["diff"], template=analysis_template)
-    # Chain the prompt with the LLM using the new operator syntax.
+    analysis_prompt = PromptTemplate(
+        input_variables=["diff"],
+        template=analysis_template
+    )
+    # Compose the analysis chain.
     analysis_chain = analysis_prompt | llm
-    result = analysis_chain.invoke({"diff": diff_text})
-    # Convert result to string if it's an AIMessage or has a 'content' attribute.
-    if hasattr(result, "content"):
-        result = result.content
-    print("✅ Analysis complete!")
-    return result
 
-
-def generate_report(diff_text: str, analysis_text: str, pr_link: str, target: str, llm: ChatOpenAI) -> str:
-    """
-    Uses the new runnable chain style to generate the final PR report.
-    """
-    print("📝 Generating formatted PR report. Please wait...")
+    # Define the report prompt template based on target formatting.
     if target.lower() == "slack":
         report_section = (
             "Guys, please review the following PR.\n\n"
@@ -99,8 +97,8 @@ def generate_report(diff_text: str, analysis_text: str, pr_link: str, target: st
             "PR Link: {pr_link}"
         )
 
-    template = (
-        "You are an assistant that summarizes code changes for a pull request. Based on the provided diff and the analysis, "
+    report_template = (
+        "You are an assistant that summarizes code changes for a pull request. Based on the provided diff and analysis, "
         "generate a report using the following structure:\n\n"
         f"{report_section}\n\n"
         "Diff:\n"
@@ -108,16 +106,36 @@ def generate_report(diff_text: str, analysis_text: str, pr_link: str, target: st
         "Analysis:\n"
         "{analysis}"
     )
-    report_prompt = PromptTemplate(input_variables=["diff", "analysis", "pr_link"], template=template)
-    # Chain the report prompt with the LLM.
-    report_chain = report_prompt | llm
-    result = report_chain.invoke(
-        {"diff": diff_text, "analysis": analysis_text, "pr_link": pr_link}
+    report_prompt = PromptTemplate(
+        input_variables=["diff", "analysis", "pr_link"],
+        template=report_template
     )
-    if hasattr(result, "content"):
-        result = result.content
-    print("✅ PR report generation complete!")
-    return result
+    # Compose the report chain.
+    report_chain = report_prompt | llm
+
+    def pipeline(inputs: dict) -> str:
+        # First, run analysis on the diff.
+        print("🤖 Starting analysis of the diff. This may take a moment...")
+        analysis_result = analysis_chain.invoke({"diff": inputs["diff"]})
+        # Ensure the output is a string.
+        if hasattr(analysis_result, "content"):
+            analysis_result = analysis_result.content
+        print("✅ Analysis complete!")
+
+        # Now, use the analysis to generate the final report.
+        print("📝 Generating formatted PR report. Please wait...")
+        report_input = {
+            "diff": inputs["diff"],
+            "analysis": analysis_result,
+            "pr_link": inputs["pr_link"]
+        }
+        report_result = report_chain.invoke(report_input)
+        if hasattr(report_result, "content"):
+            report_result = report_result.content
+        print("✅ PR report generation complete!")
+        return report_result
+
+    return pipeline
 
 
 def main():
@@ -145,9 +163,12 @@ def main():
             base_url="https://api.deepseek.com"  # Custom base URL if needed.
         )
 
-        analysis_text = analyze_diff(diff_text, llm)
-        pr_report = generate_report(diff_text, analysis_text, args.pr_link, args.target, llm)
+        # Build the chained pipeline.
+        pipeline = build_pipeline(llm, args.target)
+        chain_inputs = {"diff": diff_text, "pr_link": args.pr_link}
+        pr_report = pipeline(chain_inputs)
 
+        # Copy report to clipboard and print to console.
         pyperclip.copy(pr_report)
         print("\n📋 Generated PR report copied to clipboard!\n")
         console.print(Markdown(pr_report))
