@@ -1,7 +1,13 @@
 pdfminer.six
 youtube-transcript-api
-pyperclip
 xmltodict
 tabulate
 google-api-python-client
 python-dotenv
+
+PyGithub>=1.55.0
+requests>=2.25.1
+pyperclip>=1.8.2
+rich>=10.0.0
+langchain>=0.2.0
+langchain-openai>=0.0.1
