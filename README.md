@@ -104,7 +104,7 @@ It is recommended to use a virtual environment for this project to avoid conflic
 1. **Create a Virtual Environment:**
 
    ```bash
-   python -m venv venv
+   python -m venv cli-tools-env
    ```
 
 2. **Activate the Virtual Environment:**
