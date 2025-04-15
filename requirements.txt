@@ -1,3 +1,4 @@
+# PDF and YouTube Utilities Dependencies
 pdfminer.six
 youtube-transcript-api
 xmltodict
@@ -5,9 +6,19 @@ tabulate
 google-api-python-client
 python-dotenv
 
+# GitHub integration and HTTP requests
 PyGithub>=1.55.0
-requests>=2.25.1
 pyperclip>=1.8.2
-rich>=10.0.0
+
+# LangChain integration
 langchain>=0.2.0
 langchain-openai>=0.0.1
+
+# Additional interactive CLI tools
+questionary
+smolagents
+
+# Dependencies required by smolagents and related packages
+docling-core>=2.14.0,<3.0.0
+anyio>=3.6.1,<4.0.0
+httpx>=0.23.0,<4.0.0
