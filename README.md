@@ -1,128 +1,142 @@
-# CLI Utilities (PDF, YouTube and Github)
+# CLI Utilities (PDF, YouTube, and GitHub)
 
-This repository contains Python scripts for working with PDF files, YouTube video transcripts, and GitHub pull request descriptions. You can extract text from a specific page in a PDF, search for keywords within all PDF files in a directory, copy YouTube video transcripts, and even generate formatted GitHub PR reports using interactive prompts.
+This repository contains Python scripts that let you work with PDF files, YouTube video transcripts, and GitHub pull request descriptions using an agentic, multi-step approach powered by smolagents, LangChain, and Deepseek. You can extract text from specific pages in PDFs, search for keywords in PDFs throughout a directory, obtain detailed YouTube video analyses (including dynamic tag generation), and generate formatted GitHub PR reports—with the option to automatically update PR descriptions.
 
-## Scripts
+## Scripts & Capabilities
 
-### 1. `read_page_in_pdf.py`
-This script extracts text from a specific page of a PDF file.
+### 1. PDF Utilities
 
-#### Usage:
+**a. `read_page_in_pdf.py`**  
+Extracts text from a specified page of a PDF file.
+
+**Usage:**
 ```bash
 python read_page_in_pdf.py <pdf_file_path> <page_number>
 ```
 
-#### Arguments:
-- `<pdf_file_path>`: The path to the PDF file.
-- `<page_number>`: The page number to extract (1-based index).
-
-#### Example:
+**Example:**
 ```bash
 python read_page_in_pdf.py myfile.pdf 2
 ```
 
-### 2. `search_in_pdf.py`
-This script recursively searches through all PDF files in a given directory for a specific keyword and extracts the paragraph containing the keyword.
+**b. `search_in_pdf.py`**  
+Recursively searches PDF files in a directory for a keyword and extracts the surrounding paragraph.
 
-#### Usage:
+**Usage:**
 ```bash
 python search_in_pdf.py <directory> <keyword>
 ```
 
-#### Arguments:
-- `<directory>`: The directory to search (use `.` for the current directory).
-- `<keyword>`: The keyword to search for within the PDF files.
-
-#### Example:
+**Example:**
 ```bash
 python search_in_pdf.py ./documents "CQRS"
 ```
 
-#### Features:
-- Recursively searches all PDFs in the specified directory.
-- Extracts the paragraph surrounding the keyword.
-- Displays the page number and the extracted paragraph for each occurrence.
+### 2. Unified Agent for GitHub and YouTube
 
-### 3. `youtube_transcript.py`
-This script fetches the transcript of a YouTube video and generates a detailed video transcript analysis using LangChain and Deepseek. It offers options to run in prompt-only mode (which generates only the analysis prompt without invoking the LLM) or to obtain the full analysis result. When using Markdown output, you can choose between generating dynamic tags (based on the analysis output) or using static tags. The final output—including YAML metadata—is copied to your clipboard and displayed using Rich's Markdown rendering.
+The `main.py` script now serves as a unified command-line interface with subcommands.
 
-#### Usage:
+**a. GitHub Agent**
+
+Generate a formatted GitHub pull request (PR) report by:
+
+- Fetching the diff from a GitHub PR.
+- Analyzing code changes via Deepseek.
+- Generating a detailed, structured report (in GitHub Markdown or Slack style).
+- Displaying the current PR description and optionally updating it.
+
+**Usage:**
 ```bash
-python youtube_transcript.py <video_id_or_url> [--language <lang_code>] [--target markdown|slack] [--prompt-only] [--dynamic-tags]
+python main.py github <pr_link> [--target github|slack]
 ```
 
-#### Arguments:
-- `<video_id_or_url>`: The ID or URL of the YouTube video.
-- `--language`: Language code for the transcript (default: en).
-- `--target`: Output format option (markdown (default) or slack).
-- `--prompt-only`: If set, only generate the prompt without invoking the LLM.
-- `--dynamic-tags`: If set, generate dynamic tags based on the analysis output; if not set, static tags will be used.
-
-#### Example:
+**Example:**
 ```bash
-python youtube_transcript.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --dynamic-tags
+python main.py github "https://github.com/owner/repo/pull/123" --target slack
 ```
 
-#### Features:
-- Extracts the transcript from a YouTube video.
-- Generates and sends an analysis prompt to an LLM via LangChain.
-- Offers comprehensive analysis options including dynamic tag generation.
-- Supports both Markdown and Slack output formats.
-- Copies the final result to your clipboard and pretty-prints it in the terminal.
+**b. YouTube Agent**
 
-### 4. `github_desc.py`
-This script generates a formatted pull request (PR) report by fetching the diff from a GitHub PR, analyzing it with Deepseek, and then creating a detailed report using LangChain. The report can be formatted for GitHub (Markdown) or Slack, and the final output is automatically copied to your clipboard. Interactive prompts (using Questionary) ask if you want to update the PR description.
+Analyze a YouTube video transcript by:
 
-#### Usage:
+- Extracting the video ID and fetching its title.
+- Retrieving and formatting the transcript.
+- Creating and sending an analysis prompt to an LLM to generate a detailed breakdown.
+- Optionally generating dynamic tags for Markdown output.
+- Copying the final result to your clipboard and displaying it using Rich.
+
+**Usage:**
 ```bash
-python github_desc.py <pr_link> [--target github|slack]
+python main.py youtube <video_id_or_url> [--language <lang_code>] [--target markdown|slack] [--prompt-only] [--dynamic-tags]
 ```
 
-#### Arguments:
-- `<pr_link>`: The GitHub pull request URL.
-- `--target`: Output format option (github (default) or slack).
-
-#### Example:
+**Example:**
 ```bash
-python github_desc.py "https://github.com/owner/repo/pull/123" --target slack
+python main.py youtube "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --dynamic-tags
 ```
 
-#### Features:
-- Fetches the diff (patch) from a private GitHub repository.
-- Analyzes the code changes using Deepseek.
-- Generates a detailed PR report with structured sections.
-- Supports both GitHub Markdown and Slack formatting.
-- Uses interactive prompts to confirm if the PR description should be updated.
-- Copies the final report to your clipboard for easy sharing.
+## Features
+
+- **PDF Utilities:**
+  - Extract specific pages.
+  - Perform keyword searches with context extraction.
+  
+- **GitHub Agent:**
+  - Automatically fetch and analyze GitHub PR diffs.
+  - Generate detailed, formatted reports in multiple output styles.
+  - Display the current PR description and update it via interactive prompts.
+  - Copy the generated report to your clipboard for easy sharing.
+  
+- **YouTube Agent:**
+  - Fetch video transcripts and video metadata.
+  - Generate in-depth transcript analysis with a chronological breakdown.
+  - Option for dynamic tag generation for Markdown reports.
+  - Offers a "prompt-only" mode to preview the generated prompt.
+  - Copies the final result to your clipboard and renders it using Rich.
 
 ## Setup and Installation
 
-It is recommended to use a virtual environment for this project to avoid conflicts with other Python packages on your system.
+### 1. Create and Activate a Virtual Environment
 
-### Setting Up a Virtual Environment
+Create a virtual environment:
+```bash
+python -m venv venv
+```
 
-1. **Create a Virtual Environment:**
+Activate the virtual environment:
 
-   ```bash
-   python -m venv venv
-   ```
+- On **Linux/macOS**:
+  ```bash
+  source venv/bin/activate
+  ```
+- On **Windows**:
+  ```bash
+  venv\Scripts\activate
+  ```
 
-2. **Activate the Virtual Environment:**
-   - On **Linux/macOS**:
-     ```bash
-     source venv/bin/activate
-     ```
-   - On **Windows**:
-     ```bash
-     venv\Scripts\activate
-     ```
+### 2. Install Dependencies
 
-3. **Install the Required Dependencies:**
+Install the required packages:
+```bash
+pip install -r requirements.txt
+```
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Environment Variables
 
-## Requirements
+Create a `.env` file (or set environment variables) with the following keys:
 
-This project uses a `requirements.txt` file to manage dependencies. The dependencies are pinned to specific versions to avoid conflicts (especially for smolagents and its related packages).
+- **DEEPSEEK_API_KEY:** API key for Deepseek/ChatOpenAI.
+- **GITHUB_TOKEN_WORK:** Token for accessing private GitHub repositories.
+- **YOUTUBE_API_KEY:** API key for the YouTube Data API.
+
+## Usage Examples
+
+### Generate a GitHub PR Report:
+```bash
+python main.py github "https://github.com/owner/repo/pull/123" --target github
+```
+
+### Analyze a YouTube Video with Dynamic Tags:
+```bash
+python main.py youtube "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --dynamic-tags
+```
