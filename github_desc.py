@@ -5,6 +5,7 @@ import requests
 from github import Github
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.panel import Panel
 import questionary
 import traceback
 
@@ -65,8 +66,7 @@ def analyze_diff(diff: str, llm: ChatOpenAI) -> str:
         f"{diff}"
     )
     print("🤖 Starting analysis of the diff. This may take a moment...")
-    # Pass the prompt string directly instead of a dictionary.
-    result = llm.invoke(prompt)
+    result = llm.invoke(prompt)  # Pass prompt as a string.
     analysis = result.content if hasattr(result, "content") else result
     print("✅ Analysis complete!")
     return analysis
@@ -122,7 +122,6 @@ def generate_report(diff: str, analysis: str, pr_link: str, target: str, llm: Ch
         f"{analysis}"
     )
     print("📝 Generating formatted PR report. Please wait...")
-    # Pass the prompt string directly.
     result = llm.invoke(report_prompt)
     pr_report = result.content if hasattr(result, "content") else result
     print("✅ PR report generation complete!")
@@ -147,20 +146,18 @@ def main():
         print("🚀 Starting PR report generation process...\n")
         diff_text = get_pr_diff(args.pr_link)
 
-        # Initialize the LLM using ChatOpenAI from langchain_openai.
         DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
         if not DEEPSEEK_API_KEY:
             raise Exception("🚫 DEEPSEEK_API_KEY environment variable not set")
-            
+
         llm = ChatOpenAI(
             api_key=DEEPSEEK_API_KEY,
             model_name="deepseek-chat",
-            base_url="https://api.deepseek.com"  # Custom base URL if needed.
+            base_url="https://api.deepseek.com"
         )
 
-        # Run the analysis tool.
+        # Run the analysis and then the report generation.
         analysis = analyze_diff(diff=diff_text, llm=llm)
-        # Run the report generation tool.
         pr_report = generate_report(
             diff=diff_text,
             analysis=analysis,
@@ -169,25 +166,32 @@ def main():
             llm=llm
         )
 
-        # Copy report to clipboard and print it to the console.
+        # Copy the report to clipboard and display it.
         pyperclip.copy(pr_report)
         print("\n📋 Generated PR report copied to clipboard!\n")
         console.print(Markdown(pr_report))
 
-        # Prompt the user to update the PR description.
-        update_choice = questionary.confirm("Do you want to update the PR description with this report?").ask()
+        # Fetch and display the current PR description in a formatted way.
+        GITHUB_TOKEN = os.getenv("GITHUB_TOKEN_WORK")
+        if not GITHUB_TOKEN:
+            raise Exception("🚫 GITHUB_TOKEN_WORK environment variable not set")
+        g = Github(GITHUB_TOKEN)
+        parts = args.pr_link.rstrip("/").split("/")
+        owner = parts[3]
+        repo = parts[4]
+        pr_number = int(parts[6])
+        repository = g.get_repo(f"{owner}/{repo}")
+        pr = repository.get_pull(pr_number)
+
+        current_desc = pr.body if pr.body else "No description provided."
+        console.print(Panel(current_desc, title="Current PR Description", expand=False))
+
+        # Ask if the user wants to update the PR description.
+        update_choice = questionary.confirm(
+            "Do you want to update the PR description with the generated report?"
+        ).ask()
         if update_choice:
             print("🔄 Updating the PR description with the generated report...")
-            GITHUB_TOKEN = os.getenv("GITHUB_TOKEN_WORK")
-            if not GITHUB_TOKEN:
-                raise Exception("🚫 GITHUB_TOKEN_WORK environment variable not set")
-            g = Github(GITHUB_TOKEN)
-            parts = args.pr_link.rstrip("/").split("/")
-            owner = parts[3]
-            repo = parts[4]
-            pr_number = int(parts[6])
-            repository = g.get_repo(f"{owner}/{repo}")
-            pr = repository.get_pull(pr_number)
             pr.edit(body=pr_report)
             print("✅ PR description updated successfully!")
         else:
