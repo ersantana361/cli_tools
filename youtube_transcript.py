@@ -1,14 +1,20 @@
 import argparse
 import os
 import re
+import pyperclip
+import traceback
 from youtube_transcript_api import YouTubeTranscriptApi
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
-from langchain.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
 from rich.console import Console
 from rich.markdown import Markdown
-import pyperclip
+from rich.panel import Panel
+
+# Use the updated ChatOpenAI from langchain_openai.
+from langchain_openai import ChatOpenAI
+
+# Import the tool decorator from smolagents.
+from smolagents import tool
 
 # Load environment variables.
 load_dotenv()
@@ -20,7 +26,7 @@ if not DEEPSEEK_API_KEY:
     raise Exception("Missing DEEPSEEK_API_KEY environment variable")
 
 
-def extract_video_id(url):
+def extract_video_id(url: str) -> str:
     """
     Extracts the video ID from a YouTube URL or a direct ID input.
     """
@@ -35,7 +41,7 @@ def extract_video_id(url):
     return url
 
 
-def get_video_title(video_id):
+def get_video_title(video_id: str) -> str:
     """
     Fetches the video title from the YouTube API given a video ID.
     """
@@ -49,7 +55,7 @@ def get_video_title(video_id):
         return "Untitled Video"
 
 
-def format_time(seconds_float):
+def format_time(seconds_float: float) -> str:
     """
     Formats a floating point number (in seconds) into MM:SS format.
     """
@@ -58,52 +64,31 @@ def format_time(seconds_float):
     return f"{minutes}:{seconds:02d}"
 
 
-def generate_dynamic_tags(analysis_text, llm):
+@tool
+def analyze_video(video_url: str, language: str, target: str, prompt_only: bool, llm: ChatOpenAI) -> dict:
     """
-    Uses LangChain to generate dynamic tags based on the provided analysis text.
-    Returns a YAML-formatted list of tags without any markdown code fences.
+    Analyzes a YouTube video transcript and produces an analysis or prompt.
+
+    Args:
+        video_url: The YouTube video URL or ID.
+        language: Transcript language code (e.g. "en").
+        target: Output format option ("markdown" or "slack").
+        prompt_only: If True, returns the generated prompt text without invoking the LLM.
+        llm: The ChatOpenAI instance to use for analysis.
+    Returns:
+        A dictionary with keys:
+          - "video_title": Title of the video.
+          - "analysis": Analysis output (if prompt_only is False) or
+          - "prompt": Generated prompt (if prompt_only is True).
     """
     console = Console()
-    console.print("[green]Generating dynamic tags from analysis...[/green]")
-    prompt_text = f"""
-Based on the following YouTube video analysis, generate a list of relevant tags.
-Return the tags as a YAML list (for example:
-  - tag1
-  - tag2
-) without any extra commentary.
-
-Analysis:
-{analysis_text}
-"""
-    tag_prompt = PromptTemplate(input_variables=[], template=prompt_text)
-    tag_chain = tag_prompt | llm
-    tags_result = tag_chain.invoke({})
-    if hasattr(tags_result, "content"):
-        tags_result = tags_result.content
-    # Remove any code fences such as "```yaml" or "```".
-    tags_result = tags_result.replace("```yaml", "").replace("```", "").strip()
-    console.print("[green]Dynamic tags generation complete.[/green]")
-    return tags_result
-
-
-def generate_video_analysis(video_url, language, target, prompt_only=False):
-    """
-    Generates the full analysis prompt for a YouTube video transcript.
-    If prompt_only is True, returns the generated prompt text without invoking the LLM.
-    Otherwise, sends the prompt to the LLM via LangChain and returns the analysis result.
-    """
-    console = Console()
-    console.print("[bold green]🚀 Starting video analysis process...[/bold green]")
-    
-    # Extract video ID and fetch video title.
-    video_id = extract_video_id(video_url)
     console.print("[green]Extracting video ID...[/green]")
+    video_id = extract_video_id(video_url)
     video_title = get_video_title(video_id)
     console.print(f"[green]Fetched video title:[/green] {video_title}")
     
     video_base_url = f"https://youtu.be/{video_id}"
     
-    # Fetch the transcript.
     console.print("[green]Fetching video transcript...[/green]")
     transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
     if not transcript:
@@ -116,12 +101,10 @@ def generate_video_analysis(video_url, language, target, prompt_only=False):
         formatted_time = format_time(start_time)
         link = f"{video_base_url}?t={int(start_time)}"
         transcript_entries.append(f"{formatted_time} (Link: {link}): {entry['text']}")
-    transcript_entries_text = "\n".join(transcript_entries)
+    transcript_text = "\n".join(transcript_entries)
     
-    # Build the analysis prompt.
     console.print("[green]Building analysis prompt...[/green]")
     if target.lower() == "slack":
-        # Slack-friendly formatting.
         prompt_text = f"""
 *Video Analysis Request*
 
@@ -148,27 +131,27 @@ Summarize the video's progression, highlighting key milestones and learning outc
 YouTube Link: {video_url}
 
 [TRANSCRIPT START]
-{transcript_entries_text}
+{transcript_text}
 [TRANSCRIPT END]
 """
     else:
-        # Default: Markdown formatting.
+        # Default is Markdown-friendly formatting.
         prompt_text = f"""
 **Video Analysis Request**
 
 Analyze this YouTube video transcript and provide a detailed breakdown.
 
-### **Introduction**
+### Introduction
 - **Title**: [{video_title}]({video_url})
 - **Overview**: Provide a comprehensive explanation of the video's key objectives and themes.
 
-### **Chronological Analysis**
+### Chronological Analysis
 For each significant segment:
 - Identify section titles and timestamps.
 - Present 1-2 verbatim excerpts from the transcript.
 - Provide detailed technical analysis.
 
-### **Conclusion**
+### Conclusion
 Summarize the video's progression, highlighting key milestones and learning outcomes.
 
 **Requirements**:
@@ -179,91 +162,119 @@ Summarize the video's progression, highlighting key milestones and learning outc
 YouTube Link: {video_url}
 
 [TRANSCRIPT START]
-{transcript_entries_text}
+{transcript_text}
 [TRANSCRIPT END]
 """
-    
-    # If prompt-only mode is enabled, return the prompt text.
     if prompt_only:
         console.print("[green]Prompt-only mode enabled. Returning generated prompt without invoking LLM.[/green]")
-        return prompt_text, video_title
-
-    # Create a LangChain prompt template using the complete prompt.
-    analysis_prompt = PromptTemplate(input_variables=[], template=prompt_text)
+        return {"video_title": video_title, "prompt": prompt_text}
     
-    # Initialize the ChatOpenAI instance.
-    console.print("[green]Initializing LLM via LangChain...[/green]")
-    llm = ChatOpenAI(
-        api_key=DEEPSEEK_API_KEY,
-        model_name="deepseek-chat",
-        base_url="https://api.deepseek.com"
-    )
-    
-    # Chain the prompt with the LLM.
     console.print("[green]Sending prompt to LLM for analysis...[/green]")
-    analysis_chain = analysis_prompt | llm
-    result = analysis_chain.invoke({})
-    if hasattr(result, "content"):
-        result = result.content
+    # Invoke the LLM with the prompt text.
+    result = llm.invoke(prompt_text)
+    analysis = result.content if hasattr(result, "content") else result
     console.print("[green]Analysis complete.[/green]")
-    
-    return result, video_title
+    return {"video_title": video_title, "analysis": analysis}
+
+
+@tool
+def generate_video_tags(analysis_text: str, llm: ChatOpenAI) -> str:
+    """
+    Generates dynamic YAML-formatted tags for a video based on its analysis.
+
+    Args:
+        analysis_text: The video analysis text.
+        llm: The ChatOpenAI instance to use for tag generation.
+    Returns:
+        A string containing YAML-formatted tags without code fences.
+    """
+    console = Console()
+    console.print("[green]Generating dynamic tags from analysis...[/green]")
+    prompt_text = f"""
+Based on the following YouTube video analysis, generate a list of relevant tags.
+Return the tags as a YAML list (for example:
+  - tag1
+  - tag2
+) without any extra commentary.
+
+Analysis:
+{analysis_text}
+"""
+    result = llm.invoke(prompt_text)
+    tags_result = result.content if hasattr(result, "content") else result
+    # Remove any code fences.
+    tags_result = tags_result.replace("```yaml", "").replace("```", "").strip()
+    console.print("[green]Dynamic tags generation complete.[/green]")
+    return tags_result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate a detailed YouTube video transcript analysis using LangChain."
+        description="Generate a detailed YouTube video transcript analysis using smolagents."
     )
     parser.add_argument('video', help="YouTube video ID or URL")
     parser.add_argument('--language', default='en', help="Language code (default: en)")
-    parser.add_argument('--target', choices=["markdown", "slack"], default="markdown", 
+    parser.add_argument('--target', choices=["markdown", "slack"], default="markdown",
                         help="Output format option: markdown (default) or slack")
-    parser.add_argument('--prompt-only', action="store_true", 
+    parser.add_argument('--prompt-only', action="store_true",
                         help="Generate the prompt only without invoking the LLM")
     parser.add_argument('--dynamic-tags', action="store_true",
                         help="Generate dynamic tags based on the analysis output; if not set, static tags will be used")
     args = parser.parse_args()
     
-    # Generate analysis result or prompt.
-    analysis_output, video_title = generate_video_analysis(args.video, args.language, args.target, args.prompt_only)
+    console = Console()
+
+    # Initialize the ChatOpenAI instance.
+    llm = ChatOpenAI(
+        api_key=DEEPSEEK_API_KEY,
+        model_name="deepseek-chat",
+        base_url="https://api.deepseek.com"
+    )
+
+    # Run the video analysis tool.
+    analysis_result = analyze_video(
+        video_url=args.video,
+        language=args.language,
+        target=args.target,
+        prompt_only=args.prompt_only,
+        llm=llm
+    )
     
-    # Prepare metadata for Markdown output.
-    if args.target.lower() == "markdown":
-        if not args.prompt_only and args.dynamic_tags:
-            # Generate dynamic tags if enabled and analysis was performed.
-            llm_for_tags = ChatOpenAI(
-                api_key=DEEPSEEK_API_KEY,
-                model_name="deepseek-chat",
-                base_url="https://api.deepseek.com"
-            )
-            dynamic_tags = generate_dynamic_tags(analysis_output, llm_for_tags)
-            metadata = f"""---
+    video_title = analysis_result.get("video_title", "Untitled Video")
+    if args.prompt_only:
+        output_body = analysis_result.get("prompt")
+    else:
+        output_body = analysis_result.get("analysis")
+    
+    # If markdown output and dynamic tags flag is set (and we're not in prompt-only mode), generate tags.
+    if args.target.lower() == "markdown" and (not args.prompt_only) and args.dynamic_tags:
+        dynamic_tags = generate_video_tags(analysis_text=output_body, llm=llm)
+        metadata = f"""---
 title: {video_title} Video Analysis Report
 draft: false
 tags:
 {dynamic_tags}
 ---
 """
-        else:
-            # Use static tags.
-            metadata = f"""---
+    else:
+        metadata = f"""---
 title: {video_title} Video Analysis Report
 draft: false
 tags:
   - youtube
   - video analysis
-  - transcript
-  - langchain
 ---
 """
-        final_output = metadata + "\n" + analysis_output
+    
+    if args.target.lower() == "markdown":
+        final_output = metadata + "\n" + output_body
     else:
-        final_output = analysis_output
+        final_output = output_body
 
     # Copy the final output to the clipboard.
     pyperclip.copy(final_output)
     
     # Pretty-print the final output using Rich Markdown.
-    console = Console()
+    console.print(Panel(f"Video Title: {video_title}", title="Video Analysis", expand=False))
     console.print(Markdown("=== Video Analysis Output ==="))
-    console.print(Markdown(final_output))
+    console.print(Markdown(final_output))
