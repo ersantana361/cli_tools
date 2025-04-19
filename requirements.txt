@@ -28,3 +28,5 @@ rich>=13.0.0  # Added for rich console output and progress bars
 # HTTP/Network
 httpx>=0.23.0,<4.0.0
 anyio>=3.6.1,<4.0.0
+
+gitpython==3.1.32
