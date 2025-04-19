@@ -1,4 +1,3 @@
-import os
 from rich.console import Console
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_openai import ChatOpenAI
