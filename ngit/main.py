@@ -6,7 +6,7 @@ from tools.tidy import run_tidy
 def main():
     parser = argparse.ArgumentParser(
         prog="ngit",
-        description="Next-generation Git workflow tools",
+        description="Next-generation Git workflow tools with AI integration",
         formatter_class=argparse.RawTextHelpFormatter
     )
     
@@ -15,19 +15,19 @@ def main():
     # Tidy Subcommand
     tidy_parser = subparsers.add_parser(
         "tidy",
-        help="Organize working changes into semantic commits",
+        help="Organize changes into semantic commits with AI support",
         description="""▓▒░ Structured Commit Creation ░▒▓
 
-Operates exclusively on UNSTAGED changes in the working directory:
-1. Analyzes modified files
-2. Classifies changes using AST analysis
-3. Creates new commits preserving original order
-4. Leaves working directory clean
+Features:
+├── AST-based change classification
+├── AI-powered commit messages (--ai)
+├── Interactive review mode (-i)
+├── Automatic Git state backups
+└── Multi-language support
 
-Safety Mechanisms:
-├── Backup reference created at refs/gittidy-backup
-├── Atomic operations - aborts on conflict
-└── No existing commits are modified""",
+AI Requirements:
+- DEEPSEEK_API_KEY environment variable
+- Internet connection""",
         formatter_class=argparse.RawTextHelpFormatter
     )
     
@@ -40,26 +40,24 @@ Safety Mechanisms:
     tidy_parser.add_argument(
         "-i", "--interactive",
         action="store_true",
-        help="""Interactive mode:
-- Review each change
-- Override classifications
-- Confirm before committing"""
+        help="Step through changes with visual confirmation"
     )
     tidy_parser.add_argument(
         "-g", "--granularity",
         choices=["atomic", "category"],
         default="category",
-        help="""Commit grouping strategy:
-atomic   - Individual changes
-category - Group by type (default)"""
+        help="Commit grouping strategy"
     )
     tidy_parser.add_argument(
         "-l", "--language",
         choices=["python", "js"],
         default="python",
-        help="""Analysis language:
-python - Full syntax tree analysis
-js     - Basic pattern matching"""
+        help="Analysis language"
+    )
+    tidy_parser.add_argument(
+        "--ai",
+        action="store_true",
+        help="Generate semantic commit messages using LLM"
     )
 
     args = parser.parse_args()
@@ -72,14 +70,14 @@ js     - Basic pattern matching"""
                 interactive=args.interactive,
                 granularity=args.granularity,
                 language=args.language,
-                console=console
+                console=console,
+                use_ai=args.ai
             )
         except KeyboardInterrupt:
             console.print("\n[bold red]Operation cancelled[/]")
             console.print("Recover with: [cyan]git reset --hard refs/gittidy-backup[/]")
         except Exception as e:
             console.print(f"[bold red]Error:[/] {str(e)}")
-            console.print("[yellow]Check backup: [cyan]git show refs/gittidy-backup[/]")
 
 if __name__ == "__main__":
     main()
