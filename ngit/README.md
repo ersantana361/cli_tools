@@ -1,64 +1,115 @@
-# ngit-tidy 🧹🚀
+# ngit - Structured Git Workflows 🧹🚀
 
-A Git extension with AI-powered commit messages for structured workflows.
+**Inspired by Kent Beck's "Tidy First?" philosophy**  
+*"Before making a change, first make the code structure match the desired behavior, then make the obvious behavioral change."*
+
+## Philosophical Foundation
+
+Kent Beck's ["Tidy First?"](https://tidyfirst.substack.com/) introduces a crucial software development practice:
+```text
+1. Tidy (Structural Changes):  
+   - Improve code structure without altering behavior  
+   - Renames, interface extraction, dependency reorganization  
+
+2. Behavior Changes:  
+   - Add features, fix bugs, modify functionality  
+   - Keep focused on user-visible outcomes
+```
+
+**ngit operationalizes this philosophy** by:
+```mermaid
+flowchart LR
+    A[Uncommitted Changes] --> B{ngit tidy}
+    B --> C[🧹 Structural Commit]
+    B --> D[🚀 Behavioral Commit]
+    C --> E[Clean History]
+    D --> E
+```
+
+## How ngit Enables "Tidy First"
+
+### 1. Intentional Code Evolution
+```bash
+# Before
+git commit -m "Update stuff"
+
+# With ngit
+ngit tidy --ai
+# Creates:
+# - chore(core): normalize service interfaces [structural]
+# - feat(auth): add session timeout [behavioral]
+```
+
+### 2. Safe Refactoring
+```bash
+# Automatic backup before any changes
+🔒 Backup ID: 9804c08 (2024-03-15 14:30:00)
+
+# Focused structural changes
+ngit tidy -g atomic --language python
+# Rename utils/ → core/
+# Extract validation module
+```
+
+### 3. Clear Historical Context
+```bash
+➜ ngit ls -n 2
+a1b2c3d 🧹 refactor(db): normalize transaction interface
+d4e5f6c 🚀 feat(api): add pagination to user endpoint
+```
 
 ## Key Features
 
-- **AI Commit Messages** - Generate semantic messages with `--ai`
-- **Safety First** - Automatic backups before any changes
-- **Multi-Language** - Python & JavaScript support
-- **Interactive Review** - Rich terminal interface
+| Feature                  | Beck's Concept                | ngit Implementation          |
+|--------------------------|-------------------------------|-------------------------------|
+| Change Classification    | Structural vs Behavioral      | AST analysis + ML heuristics  |
+| Atomic Operations         | Safe, incremental changes     | Automatic Git backups         |
+| Historical Transparency  | Documented evolution          | 🧹/🚀 commit markers          |
+| Focus Maintenance        | Reduce cognitive load         | Interactive review mode       |
 
-## Installation
-
-```bash
-git clone https://github.com/yourusername/ngit-tidy.git
-cd ngit-tidy
-pip install -r requirements.txt
-export DEEPSEEK_API_KEY='your-api-key'  # For AI features
-```
-
-## AI-Powered Usage
+## Getting Started
 
 ```bash
-# Generate commits with AI messages
-ngit tidy --ai
+# Install
+pip install ngit
 
-# Interactive AI mode
+# Configure AI (optional)
+export DEEPSEEK_API_KEY='your-key'
+
+# See Beck's philosophy in action
 ngit tidy --ai -i
-
-# Example output
-feat(auth): implement OAuth2 token refresh
-- Add token rotation security pattern
-- Handle expiry edge cases
 ```
 
-## Command Reference
+## Workflow Comparison
 
-```text
-❯ ngit tidy --help
-
-Options:
-  --ai            Generate commit messages using LLM
-  -i, --interactive  Step through changes interactively
-  -g {atomic,category}  Commit grouping strategy
-  -l {python,js}  Analysis language
-
-AI Requirements:
-  - DEEPSEEK_API_KEY environment variable
-  - Internet connection
+**Traditional Git**  
+```mermaid
+flowchart TB
+    A[Feature Work] --> B[Mixed Commits]
+    B --> C[Hard-to-untangle History]
 ```
 
-## FAQ
+**ngit Workflow**  
+```mermaid
+flowchart TB
+    A[Feature Work] --> B[Structural Tidying]
+    A --> C[Behavioral Changes]
+    B & C --> D[Clean, Semantic History]
+```
 
-**Q: How does the AI message generation work?**  
-A: Uses DeepSeek's API to analyze diffs and follow conventional commit guidelines.
+## Why This Matters
 
-**Q: Is my code sent to external servers?**  
-A: Yes - when using `--ai`, diffs are sent to DeepSeek's API.
+1. **Better Code Reviews**  
+   Isolated structural changes let reviewers focus on logic rather than style
 
-**Q: Can I use a different LLM?**  
-A: Currently supports DeepSeek - OpenAI support coming soon.
+2. **Accurate Bisecting**  
+   Pure behavioral commits reduce false positives when tracking regressions
 
-**Q: What if AI generation fails?**  
-A: Falls back to simple "Structural changes" messages automatically.
+3. **Sustainable Pace**  
+   Incremental tidying prevents "big bang" refactors
+
+4. **Documented Evolution**  
+   Clear history shows *why* changes were made, not just *what* changed
+
+"First tidy, then behave. ngit helps you do both with intention."  
+*– Inspired by Kent Beck's "Tidy First?"*

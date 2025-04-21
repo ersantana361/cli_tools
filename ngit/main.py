@@ -1,83 +1,55 @@
 import argparse
-from pathlib import Path
 from rich.console import Console
-from tools.tidy import run_tidy
+from core import tidy_workflow
+from git_utils import show_status, undo_operations, show_history
+from ai_utils import needs_ai_key
+
+console = Console()
 
 def main():
     parser = argparse.ArgumentParser(
         prog="ngit",
-        description="Next-generation Git workflow tools with AI integration",
+        description="Tidy First Git Workflows by Kent Beck",
         formatter_class=argparse.RawTextHelpFormatter
     )
     
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # Tidy Subcommand
-    tidy_parser = subparsers.add_parser(
-        "tidy",
-        help="Organize changes into semantic commits with AI support",
-        description="""▓▒░ Structured Commit Creation ░▒▓
-
-Features:
-├── AST-based change classification
-├── AI-powered commit messages (--ai)
-├── Interactive review mode (-i)
-├── Automatic Git state backups
-└── Multi-language support
-
-AI Requirements:
-- DEEPSEEK_API_KEY environment variable
-- Internet connection""",
-        formatter_class=argparse.RawTextHelpFormatter
-    )
     
-    tidy_parser.add_argument(
-        "path",
-        nargs="?",
-        default=".",
-        help="Path to Git repository (default: current directory)"
-    )
-    tidy_parser.add_argument(
-        "-i", "--interactive",
-        action="store_true",
-        help="Step through changes with visual confirmation"
-    )
-    tidy_parser.add_argument(
-        "-g", "--granularity",
-        choices=["atomic", "category"],
-        default="category",
-        help="Commit grouping strategy"
-    )
-    tidy_parser.add_argument(
-        "-l", "--language",
-        choices=["python", "js"],
-        default="python",
-        help="Analysis language"
-    )
-    tidy_parser.add_argument(
-        "--ai",
-        action="store_true",
-        help="Generate semantic commit messages using LLM"
-    )
+    # Tidy command
+    tidy_parser = subparsers.add_parser("tidy", help="Organize changes using Tidy First")
+    tidy_parser.add_argument("path", nargs="?", default=".")
+    tidy_parser.add_argument("--ai", action="store_true")
+    tidy_parser.add_argument("-l", "--language", choices=["python", "js"], default="python")
+    
+    # Status command
+    status_parser = subparsers.add_parser("status", help="Show repository status")
+    status_parser.add_argument("path", nargs="?", default=".")
+    
+    # Undo command
+    undo_parser = subparsers.add_parser("undo", help="Revert changes")
+    undo_parser.add_argument("path", nargs="?", default=".")
+    undo_parser.add_argument("-n", type=int, default=1)
+    
+    # History command
+    history_parser = subparsers.add_parser("history", help="Show commit history")
+    history_parser.add_argument("path", nargs="?", default=".")
+    history_parser.add_argument("-n", type=int, default=10)
 
     args = parser.parse_args()
-    console = Console()
-
-    if args.command == "tidy":
-        try:
-            run_tidy(
-                repo_path=Path(args.path).resolve(),
-                interactive=args.interactive,
-                granularity=args.granularity,
-                language=args.language,
-                console=console,
-                use_ai=args.ai
-            )
-        except KeyboardInterrupt:
-            console.print("\n[bold red]Operation cancelled[/]")
-            console.print("Recover with: [cyan]git reset --hard refs/gittidy-backup[/]")
-        except Exception as e:
-            console.print(f"[bold red]Error:[/] {str(e)}")
+    
+    try:
+        if args.command == "tidy":
+            if args.ai: needs_ai_key()
+            tidy_workflow(args, console)
+        elif args.command == "status":
+            show_status(args, console)
+        elif args.command == "undo":
+            undo_operations(args, console)
+        elif args.command == "history":
+            show_history(args, console)
+            
+    except Exception as e:
+        console.print(f"[bold red]Error:[/] {str(e)}")
 
 if __name__ == "__main__":
     main()
