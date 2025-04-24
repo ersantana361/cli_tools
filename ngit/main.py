@@ -4,6 +4,8 @@ from core import tidy_workflow
 from git_utils import show_status, undo_operations, show_history
 from ai_utils import needs_ai_key
 
+print('test')
+
 console = Console()
 
 def main():

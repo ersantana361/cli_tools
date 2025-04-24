@@ -3,6 +3,7 @@ python-dotenv
 pyperclip>=1.8.2
 xmltodict
 tabulate
+slack-sdk
 
 # PDF Processing
 pdfminer.six

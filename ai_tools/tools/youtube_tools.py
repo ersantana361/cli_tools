@@ -3,6 +3,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_openai import ChatOpenAI
 from smolagents import tool
 from tools.youtube_utils import extract_video_id, get_video_title, format_time
+from tools.slack_tools import format_for_slack  # Preserved Slack integration
 
 @tool
 def analyze_video(video_url: str, language: str, target: str, prompt_only: bool, llm: ChatOpenAI) -> dict:
@@ -40,39 +41,9 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
     transcript_text = "\n".join(transcript_entries)
     
     console.print("[green]Building analysis prompt...[/green]")
-    if target.lower() == "slack":
-        prompt_text = f"""
-*Video Analysis Request*
-
-Analyze this YouTube video transcript and provide a detailed breakdown in Slack-friendly format.
-
-*Introduction*
-- *Title*: <{video_url}|{video_title}>
-- *Overview*: Provide a comprehensive explanation of the video's key objectives and themes.
-
-*Chronological Analysis*
-For each significant segment:
-- Identify section titles and timestamps.
-- Present 1-2 verbatim excerpts from the transcript.
-- Provide detailed technical analysis.
-
-*Conclusion*
-Summarize the video's progression, highlighting key milestones and learning outcomes.
-
-*Requirements*:
-- Maintain strict chronological order.
-- Blend direct quotes with detailed analysis.
-- Output language: {language}
-
-YouTube Link: {video_url}
-
-[TRANSCRIPT START]
-{transcript_text}
-[TRANSCRIPT END]
-"""
-    else:
-        prompt_text = f"""
-**Video Analysis Request**
+    # Unified template preserves all original requirements
+    prompt_text = f"""
+## Video Analysis Request
 
 Analyze this YouTube video transcript and provide a detailed breakdown.
 
@@ -82,19 +53,20 @@ Analyze this YouTube video transcript and provide a detailed breakdown.
 
 ### Chronological Analysis
 For each significant segment:
-- Identify section titles and timestamps.
-- Present 1-2 verbatim excerpts from the transcript.
-- Provide detailed technical analysis.
+1. Identify section titles and timestamps
+2. Present 1-2 verbatim excerpts from the transcript
+3. Provide detailed technical analysis
 
 ### Conclusion
-Summarize the video's progression, highlighting key milestones and learning outcomes.
+Summarize the video's progression, highlighting:
+- Key milestones
+- Learning outcomes
+- Technical implications
 
 **Requirements**:
-- Maintain strict chronological order.
-- Blend direct quotes with detailed analysis.
+- Maintain strict chronological order
+- Blend direct quotes with analysis
 - Output language: {language}
-
-YouTube Link: {video_url}
 
 [TRANSCRIPT START]
 {transcript_text}
@@ -107,6 +79,13 @@ YouTube Link: {video_url}
     console.print("[green]Sending prompt to LLM for analysis...[/green]")
     result = llm.invoke(prompt_text)
     analysis = result.content if hasattr(result, "content") else result
+    
+    # Preserve original Slack formatting behavior through post-processing
+    if target.lower() == "slack":
+        analysis = format_for_slack(analysis, target="analysis")
+        # Add back the URL formatting from original version
+        analysis = analysis.replace(f"[{video_title}]", f"<{video_url}|{video_title}>")
+    
     console.print("[green]Analysis complete.[/green]")
     return {"video_title": video_title, "analysis": analysis}
 

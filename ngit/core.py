@@ -45,16 +45,18 @@ def tidy_workflow(args, console: Console):
             style="blue"
         ))
 
+        # First create backup of UNSTAGED changes
+        backup_ref = create_backup(repo)
+
         # Stage all changes
         repo.git.add(A=True)
         repo.git.add(u=True)
-        backup_ref = create_backup(repo)
 
         classifier = ChangeClassifier(args.language)
         changes = {"structural": [], "behavioral": []}
 
-        # Classify changes
-        for diff in repo.head.commit.diff(None, create_patch=True):
+        # Get diffs between HEAD and INDEX (staged changes)
+        for diff in repo.head.commit.diff(repo.index, create_patch=True):
             if diff.change_type in ('M', 'A', 'D'):
                 change_type = "behavioral"
                 
@@ -67,6 +69,9 @@ def tidy_workflow(args, console: Console):
                 
                 changes[change_type].append(diff.diff)
 
+        # Reset working directory to HEAD
+        repo.git.reset(hard=True)
+        
         # Create commits
         for change_type, diffs in changes.items():
             if diffs:
@@ -74,6 +79,7 @@ def tidy_workflow(args, console: Console):
                 with open(patch_file, "w") as f:
                     f.write("\n".join(diffs))
                 
+                # Apply patch and stage changes
                 repo.git.apply(patch_file)
                 repo.git.add(update=True)
                 

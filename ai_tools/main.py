@@ -9,104 +9,109 @@ def main():
         description=(
             "Unified tool suite for document processing, GitHub PR analysis, and YouTube transcript analysis.\n\n"
             "Subcommands:\n"
-            "  convert   Convert PDF documents to Markdown with rich formatting options\n"
-            "  github    Analyze GitHub pull requests and generate reports\n"
-            "  youtube   Analyze YouTube video transcripts and generate insights\n\n"
+            "  convert   Convert PDF documents to Markdown\n"
+            "  github    Analyze GitHub pull requests\n"
+            "  youtube   Analyze YouTube videos and post to Slack threads\n\n"
             "For detailed help: %(prog)s <command> -h"
         ),
         formatter_class=argparse.RawTextHelpFormatter
     )
-    subparsers = parser.add_subparsers(dest="command", required=True, help="Choose a subcommand to run")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Convert subcommand
     convert_parser = subparsers.add_parser(
         "convert",
         help="Convert PDF documents to Markdown",
-        description=(
-            "Advanced PDF conversion tool with rich feedback and processing options\n\n"
-            "Features:\n"
-            "  - Local files and URL support\n"
-            "  - Progress tracking\n"
-            "  - Multiple output formats\n"
-            "  - Clipboard integration\n"
-            "  - Verbose diagnostics"
-        )
+        description="Advanced PDF conversion with rich formatting options"
     )
-    convert_parser.add_argument("input_source", 
-                              help="PDF file path or URL")
-    convert_parser.add_argument("-o", "--output", 
-                              default="output.md",
-                              help="Output file path (default: output.md)")
-    convert_parser.add_argument("--verbose", action="store_true",
-                              help="Show detailed processing information")
-    convert_parser.add_argument("--format", choices=["basic", "enhanced"], 
-                              default="basic",
-                              help="Markdown formatting style (default: basic)")
-    convert_parser.add_argument("--clipboard", action="store_true",
-                              help="Copy result to clipboard")
+    convert_parser.add_argument("input_source", help="PDF file path or URL")
+    convert_parser.add_argument("-o", "--output", default="output.md")
+    convert_parser.add_argument("--verbose", action="store_true")
+    convert_parser.add_argument("--format", choices=["basic", "enhanced"], default="basic")
+    convert_parser.add_argument("--clipboard", action="store_true")
 
-    # GitHub subcommand (existing)
+    # GitHub subcommand
     github_parser = subparsers.add_parser(
         "github",
-        help="Generate a PR report for a GitHub pull request.",
-        description=(
-            "Generate a GitHub pull request report by analyzing the diff of the PR.\n"
-            "This command will:\n"
-            "  - Fetch the diff from GitHub using the provided PR link.\n"
-            "  - Invoke an LLM to analyze the diff and summarize key findings.\n"
-            "  - Generate a formatted report (in either GitHub or Slack style).\n"
-            "  - Show the current PR description and prompt to update it."
-        )
+        help="Generate GitHub PR reports",
+        description="Analyze pull requests and generate formatted reports"
     )
-    github_parser.add_argument("pr_link", help="GitHub PR link (private repository)")
-    github_parser.add_argument("--target", choices=["github", "slack"], default="github", 
-                             help="Output format target (default: github)")
+    github_parser.add_argument("pr_link", help="GitHub PR link")
+    github_parser.add_argument("--target", choices=["github", "slack"], default="github")
 
-    # YouTube subcommand (existing)
+    # YouTube subcommand (updated)
     youtube_parser = subparsers.add_parser(
         "youtube",
-        help="Generate a transcript analysis for a YouTube video.",
+        help="Analyze YouTube videos",
         description=(
-            "Analyze a YouTube video by fetching its transcript and running a detailed analysis via an LLM.\n"
-            "This command will:\n"
-            "  - Extract the video ID and fetch the video title.\n"
-            "  - Retrieve and format the transcript.\n"
-            "  - Generate an analysis prompt and invoke the LLM to create an analysis report.\n"
-            "  - Optionally generate dynamic tags and output a Markdown report."
+            "Analyze YouTube videos and post summaries to Slack threads\n\n"
+            "When using --target slack, you must provide:\n"
+            "  --slack-thread 'SLACK_THREAD_URL'"
         )
     )
-    youtube_parser.add_argument("video", help="YouTube video ID or URL")
-    youtube_parser.add_argument("--language", default="en", 
-                              help="Language code (default: en)")
-    youtube_parser.add_argument("--target", choices=["markdown", "slack"], default="markdown",
-                              help="Output format option (default: markdown)")
-    youtube_parser.add_argument("--prompt-only", action="store_true",
-                              help="Generate the prompt only without invoking the LLM")
-    youtube_parser.add_argument("--dynamic-tags", action="store_true",
-                              help="Generate dynamic tags based on the analysis output")
-    
+    youtube_parser.add_argument(
+        "video",
+        help="YouTube URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID)"
+    )
+    youtube_parser.add_argument(
+        "--language",
+        default="en",
+        help="Transcript language code (default: en)"
+    )
+    youtube_parser.add_argument(
+        "--target",
+        choices=["markdown", "slack"],
+        default="markdown",
+        help="Output target (required for Slack)"
+    )
+    youtube_parser.add_argument(
+        "--slack-thread",
+        help="Slack thread URL to post to (required for Slack target)"
+    )
+    youtube_parser.add_argument(
+        "--prompt-only",
+        action="store_true",
+        help="Generate prompt without LLM analysis"
+    )
+    youtube_parser.add_argument(
+        "--dynamic-tags",
+        action="store_true",
+        help="Generate dynamic content tags"
+    )
+
     args = parser.parse_args()
     console = Console()
 
-    if args.command == "convert":
-        run_conversion(
-            input_source=args.input_source,
-            output_path=args.output,
-            verbose=args.verbose,
-            markdown_format=args.format,
-            clipboard=args.clipboard,
-            console=console
-        )
-    elif args.command == "github":
-        run_github(pr_link=args.pr_link, target=args.target)
-    elif args.command == "youtube":
-        run_youtube(
-            video=args.video,
-            language=args.language,
-            target=args.target,
-            prompt_only=args.prompt_only,
-            dynamic_tags=args.dynamic_tags
-        )
+    try:
+        if args.command == "convert":
+            run_conversion(
+                input_source=args.input_source,
+                output_path=args.output,
+                verbose=args.verbose,
+                markdown_format=args.format,
+                clipboard=args.clipboard,
+                console=console
+            )
+        elif args.command == "github":
+            run_github(
+                pr_link=args.pr_link,
+                target=args.target
+            )
+        elif args.command == "youtube":
+            run_youtube(
+                video=args.video,
+                language=args.language,
+                target=args.target,
+                prompt_only=args.prompt_only,
+                dynamic_tags=args.dynamic_tags,
+                slack_thread_url=args.slack_thread
+            )
+            
+    except Exception as e:
+        console.print(f"[bold red]💥 Critical Error: {str(e)}[/bold red]")
+        if hasattr(e, "errno"):
+            console.print(f"Error code: {e.errno}")
+        exit(1)
 
 if __name__ == "__main__":
     main()
