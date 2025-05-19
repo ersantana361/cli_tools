@@ -44,33 +44,35 @@ def parse_slack_link(slack_link: str) -> dict:
 @tool
 def format_for_slack(content: str, target: str = "analysis") -> str:
     """
-    Converts markdown to Slack-compatible formatting.
-    
+    Converts markdown to clean Slack formatting with strict style rules.
+
     Args:
-        content (str): Markdown-formatted text to convert
+        content (str): Markdown content to convert
         target (str): Content type ("analysis" or "pr_report")
-    
+
     Returns:
-        str: Slack-formatted text
+        str: Properly formatted Slack text
     """
-    # Header conversion
-    content = re.sub(r'^#+\s+(.*)$', r'*\1*', content, flags=re.MULTILINE)
+    # Convert headers to bold (any # level)
+    content = re.sub(r'^#+\s+(.*?)(\s*#+)?$', r'*\1*', content, flags=re.MULTILINE)
     
-    # Bold/italic conversion
+    # Convert bold/italic to Slack format
     content = re.sub(r'\*\*(.*?)\*\*', r'*\1*', content)
     content = re.sub(r'__(.*?)__', r'_\1_', content)
     
-    # List conversion
-    content = re.sub(r'^-\s+(.*)$', r'• \1', content, flags=re.MULTILINE)
+    # Convert lists to bullet points with proper indentation
+    content = re.sub(r'^(\s*)-\s+(.*)$', r'\1• \2', content, flags=re.MULTILINE)
     
-    # Code blocks preservation
-    content = re.sub(r'```(.*?)```', r'```\1```', content, flags=re.DOTALL)
+    # Remove markdown links while preserving text
+    content = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', content)
     
-    # Link handling
-    if target == "pr_report":
-        content = re.sub(r'\[(.*?)\]\((.*?)\)', r'<\2|\1>', content)
-    else:
-        content = re.sub(r'\[(.*?)\]\((.*?)\)', r'\1 (\2)', content)
+    # Remove horizontal rules and section dividers
+    content = re.sub(r'-{3,}', '', content)
+    
+    # Clean up whitespace
+    content = re.sub(r'\n{3,}', '\n\n', content)  # Max 2 newlines
+    content = re.sub(r'[ \t]+', ' ', content)     # Remove extra spaces
+    content = re.sub(r'\n\s*\n', '\n\n', content) # Clean empty lines
     
     return content.strip()
 
@@ -103,9 +105,15 @@ def post_to_slack(
         link_info = parse_slack_link(slack_link)
         client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
         
+        # Apply final formatting
         formatted_content = format_for_slack(content, content_type)
+        
+        # Add title if provided (already formatted as bold)
         if title:
             formatted_content = f"*{title}*\n\n{formatted_content}"
+            
+        # Remove any remaining URLs
+        formatted_content = re.sub(r'https?://\S+', '', formatted_content)
 
         response = client.chat_postMessage(
             channel=link_info["channel_id"],

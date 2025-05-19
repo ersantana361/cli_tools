@@ -4,57 +4,57 @@ from tools.github_agent import run_github
 from tools.youtube_agent import run_youtube
 from tools.pdf_converter import run_conversion
 
+def validate_slack_args(args):
+    """Ensure Slack thread is provided when target is slack"""
+    if args.command == "youtube" and args.target == "slack":
+        if not args.slack_thread:
+            raise ValueError("Slack thread URL required for 'slack' target")
+
 def main():
     parser = argparse.ArgumentParser(
-        description=(
-            "Unified tool suite for document processing, GitHub PR analysis, and YouTube transcript analysis.\n\n"
-            "Subcommands:\n"
-            "  convert   Convert PDF documents to Markdown\n"
-            "  github    Analyze GitHub pull requests\n"
-            "  youtube   Analyze YouTube videos and post to Slack threads\n\n"
-            "For detailed help: %(prog)s <command> -h"
-        ),
+        description="AI-Powered YouTube Video Analyzer with Slack Integration",
         formatter_class=argparse.RawTextHelpFormatter
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Convert subcommand
+    # Convert command
     convert_parser = subparsers.add_parser(
         "convert",
-        help="Convert PDF documents to Markdown",
-        description="Advanced PDF conversion with rich formatting options"
+        help="Convert PDF to Markdown"
     )
-    convert_parser.add_argument("input_source", help="PDF file path or URL")
+    convert_parser.add_argument("input_source", help="PDF file path/URL")
     convert_parser.add_argument("-o", "--output", default="output.md")
     convert_parser.add_argument("--verbose", action="store_true")
     convert_parser.add_argument("--format", choices=["basic", "enhanced"], default="basic")
     convert_parser.add_argument("--clipboard", action="store_true")
 
-    # GitHub subcommand
+    # GitHub command
     github_parser = subparsers.add_parser(
         "github",
-        help="Generate GitHub PR reports",
-        description="Analyze pull requests and generate formatted reports"
+        help="Analyze GitHub PRs"
     )
-    github_parser.add_argument("pr_link", help="GitHub PR link")
+    github_parser.add_argument("pr_link", help="GitHub PR URL")
     github_parser.add_argument("--target", choices=["github", "slack"], default="github")
 
-    # YouTube subcommand (updated)
+    # YouTube command (updated)
     youtube_parser = subparsers.add_parser(
         "youtube",
         help="Analyze YouTube videos",
-        description=(
-            "Analyze YouTube videos and post summaries to Slack threads\n\n"
-            "When using --target slack, you must provide:\n"
-            "  --slack-thread 'SLACK_THREAD_URL'"
-        )
+        description="""YouTube Video Analysis Command
+---------------------------------
+When using Slack target:
+  Required: --slack-thread "https://slack.com/archives/CHANNEL_ID/pTIMESTAMP"
+  
+Examples:
+  Markdown: youtube "https://youtu.be/VIDEO_ID" --target markdown
+  Slack:    youtube "https://youtu.be/VIDEO_ID" --target slack --slack-thread URL"""
     )
     youtube_parser.add_argument(
         "video",
         help="YouTube URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID)"
     )
     youtube_parser.add_argument(
-        "--language",
+        "--language", 
         default="en",
         help="Transcript language code (default: en)"
     )
@@ -62,11 +62,12 @@ def main():
         "--target",
         choices=["markdown", "slack"],
         default="markdown",
-        help="Output target (required for Slack)"
+        required=True,
+        help="Output target format"
     )
     youtube_parser.add_argument(
         "--slack-thread",
-        help="Slack thread URL to post to (required for Slack target)"
+        help="Slack thread URL (required for 'slack' target)"
     )
     youtube_parser.add_argument(
         "--prompt-only",
@@ -76,13 +77,16 @@ def main():
     youtube_parser.add_argument(
         "--dynamic-tags",
         action="store_true",
-        help="Generate dynamic content tags"
+        help="Generate dynamic content tags (markdown only)"
     )
 
     args = parser.parse_args()
     console = Console()
 
     try:
+        # Validate Slack requirements
+        validate_slack_args(args)
+
         if args.command == "convert":
             run_conversion(
                 input_source=args.input_source,
@@ -106,11 +110,14 @@ def main():
                 dynamic_tags=args.dynamic_tags,
                 slack_thread_url=args.slack_thread
             )
-            
+
+    except ValueError as e:
+        console.print(f"[bold red]Validation Error:[/bold red] {str(e)}")
+        if args.command == "youtube" and "slack" in str(e).lower():
+            youtube_parser.print_help()
+        exit(1)
     except Exception as e:
-        console.print(f"[bold red]💥 Critical Error: {str(e)}[/bold red]")
-        if hasattr(e, "errno"):
-            console.print(f"Error code: {e.errno}")
+        console.print(f"[bold red]Unexpected Error:[/bold red] {str(e)}")
         exit(1)
 
 if __name__ == "__main__":

@@ -2,14 +2,18 @@ import os
 import requests
 from github import Github
 
+def get_token():
+    return os.getenv("GITHUB_TOKEN_WORK")
+    #return os.getenv("GITHUB_TOKEN_PERSONAL")
+
 def get_github_instance() -> Github:
     """
     Returns an authenticated Github instance using the GITHUB_TOKEN_WORK environment variable.
     """
-    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN_WORK")
-    if not GITHUB_TOKEN:
+    token = get_token()
+    if not token:
         raise Exception("🚫 GITHUB_TOKEN_WORK environment variable not set")
-    return Github(GITHUB_TOKEN)
+    return Github(token)
 
 def get_pr_diff(pr_url: str) -> str:
     """
@@ -29,7 +33,7 @@ def get_pr_diff(pr_url: str) -> str:
 
     api_url = pr.url
     headers = {
-        "Authorization": f"token {os.getenv('GITHUB_TOKEN_WORK')}",
+        "Authorization": f"token {get_token()}",
         "Accept": "application/vnd.github.v3.diff"
     }
     response = requests.get(api_url, headers=headers)
