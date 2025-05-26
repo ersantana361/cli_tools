@@ -272,7 +272,7 @@ def create_or_load_vector_store(chunks, embeddings, store_path):
             return None
 
 
-def retrieve_relevant_context(query, vector_store, top_k=5):
+def retrieve_relevant_context(query, vector_store, top_k=300):
     console.print(Panel("Phase 4/5: Retrieving Context", title="[bold magenta]Information Retrieval[/bold magenta]", expand=False))
     console.print(f"[INFO] Query: '[italic]{query}[/italic]'")
     console.print(f"[INFO] Retrieving top {top_k} relevant chunks from vector store.")

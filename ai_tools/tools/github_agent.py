@@ -1,3 +1,4 @@
+# tools/github_agent.py
 import os
 import pyperclip
 import traceback
@@ -5,28 +6,21 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 import questionary
-from langchain_openai import ChatOpenAI
 
 # Import GitHub helper functions and tools.
 from tools.github_utils import get_pr_diff, fetch_current_description, update_pr_description
 from tools.github_tools import analyze_diff as github_analyze_diff, generate_report as github_generate_report
+from tools.llm_config import get_llm
 
-def run_github(pr_link: str, target: str):
+def run_github(pr_link: str, target: str, llm_provider: str):
     console = Console()
     try:
         console.print("🚀 Starting GitHub PR report generation process...\n")
         # Get the PR diff.
         diff_text = get_pr_diff(pr_link)
         
-        # Initialize the ChatOpenAI instance.
-        DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-        if not DEEPSEEK_API_KEY:
-            raise Exception("Missing DEEPSEEK_API_KEY environment variable")
-        llm = ChatOpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            model_name="deepseek-chat",
-            base_url="https://api.deepseek.com"
-        )
+        # Initialize the LLM using the centralized configuration function, passing the provider.
+        llm = get_llm(llm_provider)
         
         # Run the analysis and then generate the report.
         analysis = github_analyze_diff(diff=diff_text, llm=llm)

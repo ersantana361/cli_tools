@@ -35,6 +35,12 @@ def main():
     )
     github_parser.add_argument("pr_link", help="GitHub PR URL")
     github_parser.add_argument("--target", choices=["github", "slack"], default="github")
+    github_parser.add_argument(
+        "--llm-provider",
+        choices=["anthropic", "deepseek"],
+        default="anthropic", # Default to Anthropic
+        help="Specify the LLM provider to use (anthropic or deepseek)"
+    )
 
     # YouTube command (updated)
     youtube_parser = subparsers.add_parser(
@@ -79,6 +85,14 @@ Examples:
         action="store_true",
         help="Generate dynamic content tags (markdown only)"
     )
+    # NEW: Argument to select LLM provider for YouTube command
+    youtube_parser.add_argument(
+        "--llm-provider",
+        choices=["anthropic", "deepseek"],
+        default="anthropic", # Default to Anthropic
+        help="Specify the LLM provider to use (anthropic or deepseek)"
+    )
+
 
     args = parser.parse_args()
     console = Console()
@@ -99,7 +113,8 @@ Examples:
         elif args.command == "github":
             run_github(
                 pr_link=args.pr_link,
-                target=args.target
+                target=args.target,
+                llm_provider=args.llm_provider
             )
         elif args.command == "youtube":
             run_youtube(
@@ -108,7 +123,8 @@ Examples:
                 target=args.target,
                 prompt_only=args.prompt_only,
                 dynamic_tags=args.dynamic_tags,
-                slack_thread_url=args.slack_thread
+                slack_thread_url=args.slack_thread,
+                llm_provider=args.llm_provider # Pass the new argument
             )
 
     except ValueError as e:

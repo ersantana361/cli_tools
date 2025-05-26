@@ -6,10 +6,11 @@ from typing import Optional
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from langchain_openai import ChatOpenAI
+
 from tools.youtube_tools import analyze_video, generate_video_tags
 from tools.slack_tools import post_to_slack, format_for_slack
 from tools.youtube_utils import extract_video_id
+from tools.llm_config import get_llm
 
 def run_youtube(
     video: str,
@@ -17,7 +18,8 @@ def run_youtube(
     target: str,
     prompt_only: bool,
     dynamic_tags: bool,
-    slack_thread_url: Optional[str] = None
+    slack_thread_url: Optional[str] = None,
+    llm_provider: str = "anthropic" # Added llm_provider argument with default
 ):
     console = Console()
     try:
@@ -35,16 +37,9 @@ def run_youtube(
         if not video_id or len(video_id) != 11:
             raise ValueError(f"Invalid YouTube URL: {video}")
 
-        # Initialize LLM
-        DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-        if not DEEPSEEK_API_KEY:
-            raise Exception("Missing DEEPSEEK_API_KEY environment variable")
-            
-        llm = ChatOpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            model_name="deepseek-chat",
-            base_url="https://api.deepseek.com"
-        )
+        # Initialize LLM using the centralized configuration function.
+        # The provider is passed from the command line argument.
+        llm = get_llm(llm_provider)
         
         # Run analysis
         analysis_result = analyze_video(
@@ -52,7 +47,7 @@ def run_youtube(
             language=language,
             target=target,
             prompt_only=prompt_only,
-            llm=llm
+            llm=llm # Pass the initialized LLM
         )
         
         video_title = analysis_result.get("video_title", "Untitled Video")
@@ -92,10 +87,10 @@ def run_youtube(
             )
             console.print(f"[green]✅ Successfully posted to Slack thread[/green]")
             
-        else:  # markdown output
+        else: # markdown output
             # Generate Markdown output
             if dynamic_tags and not prompt_only:
-                tags = generate_video_tags(output_body, llm)
+                tags = generate_video_tags(output_body, llm) # Pass the initialized LLM
                 metadata = f"""---
 title: {video_title}
 tags:
@@ -117,3 +112,4 @@ tags:
     except Exception as e:
         console.print(f"[red]🚫 Error: {e}[/red]")
         traceback.print_exc()
+
