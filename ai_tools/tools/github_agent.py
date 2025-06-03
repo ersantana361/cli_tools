@@ -1,5 +1,3 @@
-# tools/github_agent.py
-import os
 import pyperclip
 import traceback
 from rich.console import Console

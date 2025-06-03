@@ -1,0 +1,9 @@
+{
+  "max_comments": 8,
+  "comment_delay": 2,
+  "default_review_type": "categorized",
+  "auto_dry_run": true,
+  "confirmation_required": true,
+  "llm_provider": "anthropic",
+  "default_repo": "your-username/your-repo"
+} 

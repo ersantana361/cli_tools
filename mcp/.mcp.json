@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "pr-review": {
+      "command": "python",
+      "args": ["./claude_integrated_pr_review.py"],
+      "description": "Review GitHub pull requests"
+    }
+  }
+}
