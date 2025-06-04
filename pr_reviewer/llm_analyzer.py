@@ -104,13 +104,13 @@ class LLMAnalyzer:
             return error_msg
     
     def generate_actionable_comments(self, diff: str, pr_info: dict, files: List[dict], review_type: str) -> List[ReviewComment]:
-        """Generate actionable review comments by analyzing individual files"""
-        logger.info("🔨 Generating actionable review comments...")
+        """Generate actionable review comments with GitHub suggestion support"""
+        logger.info("🔨 Generating actionable review comments with suggestions...")
         
         comments = []
         
         try:
-            # Build a more targeted prompt for generating specific comments
+            # Build a more targeted prompt for generating specific comments with suggestions
             prompt = self._build_comment_generation_prompt(diff, pr_info, files, review_type)
             logger.debug(f"📝 Generated comment prompt ({len(prompt)} characters)")
             
@@ -120,9 +120,14 @@ class LLMAnalyzer:
             analysis = response.content if hasattr(response, 'content') else str(response)
             logger.info(f"✅ Comment analysis completed ({len(analysis)} characters)")
             
-            # Parse the analysis to extract actionable comments
+            # Parse the analysis to extract actionable comments with suggestions
             comments = self._parse_analysis_to_comments(analysis, files)
             logger.info(f"✅ Generated {len(comments)} actionable comments")
+            
+            # Count suggestions for logging
+            suggestions_count = sum(1 for comment in comments if comment.has_suggestion())
+            if suggestions_count > 0:
+                logger.info(f"✨ {suggestions_count} comments include code suggestions")
             
             return comments
             
@@ -131,13 +136,13 @@ class LLMAnalyzer:
             return []
     
     def _build_comment_generation_prompt(self, diff: str, pr_info: dict, files: List[dict], review_type: str) -> str:
-        """Build prompt specifically for generating actionable comments"""
+        """Build prompt specifically for generating actionable comments with GitHub suggestions"""
         logger.debug(f"🔨 Building comment generation prompt for {review_type}...")
         
         files_summary = "\n".join([f"- {f['filename']} ({f['status']}, +{f['additions']}/-{f['deletions']})" for f in files[:10]])
         
         base_prompt = f"""
-You are an expert code reviewer. Analyze this pull request and generate specific, actionable review comments.
+You are an expert code reviewer. Analyze this pull request and generate specific, actionable review comments with GitHub suggestion blocks where appropriate.
 
 **PR Info:**
 - Title: {pr_info.get('title', 'N/A')}
@@ -153,60 +158,81 @@ You are an expert code reviewer. Analyze this pull request and generate specific
 ```
 
 Please provide specific review comments in this EXACT format:
+
+For comments WITHOUT code suggestions:
 FILE: filename.ext
 LINE: 42
 SEVERITY: warning|error|info
 COMMENT: Your specific actionable feedback here
 
+For comments WITH code suggestions:
+FILE: filename.ext
+LINE: 42
+SEVERITY: warning|error|info
+COMMENT: Brief explanation of the issue or improvement
+ORIGINAL_CODE:
+original code to be replaced (exact text from the file)
+SUGGESTED_CODE:
+improved/corrected code that should replace the original
+END_LINE: 45 (only if suggestion spans multiple lines)
+
+**GitHub Suggestion Guidelines:**
+- Only provide suggestions when you can improve specific code (fix bugs, optimize, enhance readability)
+- Extract the EXACT original code from the diff - match it precisely
+- Provide clean, working suggested code
+- For single-line changes, only specify LINE
+- For multi-line changes, specify both LINE and END_LINE
+- Make suggestions actionable and clearly better than the original
+
 """
         
         if review_type == "security":
             prompt = base_prompt + """
-Focus on security issues:
-- Look for SQL injection, XSS, authentication bypasses
-- Check for hardcoded secrets, unsafe input handling
-- Flag authorization issues and data validation problems
-- Identify potential security vulnerabilities
+Focus on security issues with actionable suggestions:
+- SQL injection, XSS, authentication bypasses → provide secure code alternatives
+- Hardcoded secrets, unsafe input handling → suggest proper implementations
+- Authorization issues and data validation → offer corrected code
+- Provide code suggestions to fix security vulnerabilities when possible
 
-Provide 2-5 specific security-focused comments with exact file names and line numbers.
+Generate 2-5 specific security-focused comments, prioritizing suggestions that fix vulnerabilities.
 """
         elif review_type == "performance":
             prompt = base_prompt + """
-Focus on performance issues:
-- Identify inefficient algorithms, database queries, loops
-- Look for memory leaks, resource management issues
-- Check for unnecessary computations, network calls
-- Suggest optimization opportunities
+Focus on performance issues with optimization suggestions:
+- Inefficient algorithms, database queries, loops → provide optimized versions
+- Memory leaks, resource management → suggest proper implementations
+- Unnecessary computations, network calls → offer efficient alternatives
+- Provide code suggestions to improve performance when possible
 
-Provide 2-5 specific performance-focused comments with exact file names and line numbers.
+Generate 2-5 specific performance-focused comments, prioritizing suggestions that optimize code.
 """
         elif review_type == "maintainability":
             prompt = base_prompt + """
-Focus on code maintainability:
-- Check code organization, structure, naming conventions
-- Look for code duplication, complex functions
-- Assess documentation, error handling
-- Identify refactoring opportunities
+Focus on code maintainability with refactoring suggestions:
+- Code organization, naming conventions → suggest improvements
+- Code duplication, complex functions → provide cleaner alternatives
+- Documentation, error handling → offer better implementations
+- Provide code suggestions to improve readability and maintainability
 
-Provide 2-5 specific maintainability-focused comments with exact file names and line numbers.
+Generate 2-5 specific maintainability-focused comments, prioritizing suggestions that clean up code.
 """
         else:  # categorized or other
             prompt = base_prompt + """
-Provide a comprehensive review covering:
-1. **Security** - Any security concerns or vulnerabilities
-2. **Performance** - Potential performance issues
-3. **Code Quality** - Maintainability, readability, best practices
-4. **Logic** - Correctness of implementation
-5. **Testing** - Missing tests or test improvements
+Provide a comprehensive review with actionable suggestions covering:
+1. **Security** - Fix security concerns with suggested secure alternatives
+2. **Performance** - Optimize slow code with efficient implementations  
+3. **Code Quality** - Improve maintainability with cleaner code suggestions
+4. **Logic** - Correct implementation issues with working alternatives
+5. **Testing** - Suggest specific test improvements or missing tests
 
-Provide 3-8 specific comments covering different aspects, with exact file names and line numbers.
+Generate 3-8 specific comments covering different aspects. Prioritize comments with code suggestions that clearly improve the codebase.
 """
         
-        return prompt + "\n\nIMPORTANT: Only comment on files that actually exist in the diff. Use the EXACT format shown above."
+        return prompt + "\n\nIMPORTANT: Only comment on files that actually exist in the diff. Use the EXACT format shown above. When providing ORIGINAL_CODE, extract it precisely from the diff - it must match exactly for GitHub suggestions to work."
     
     def _parse_analysis_to_comments(self, analysis: str, files: List[dict]) -> List[ReviewComment]:
-        """Parse LLM analysis into structured review comments"""
-        logger.debug("🔍 Parsing analysis into structured comments...")
+        """Parse LLM analysis into structured review comments with suggestion support"""
+        logger.debug("🔍 Parsing analysis into structured comments with suggestions...")
         
         comments = []
         file_names = [f['filename'] for f in files]
@@ -214,53 +240,95 @@ Provide 3-8 specific comments covering different aspects, with exact file names 
         # Split analysis into sections and look for the structured format
         lines = analysis.split('\n')
         current_comment = {}
+        capturing_original = False
+        capturing_suggested = False
+        original_lines = []
+        suggested_lines = []
         
         for line in lines:
-            line = line.strip()
+            stripped_line = line.strip()
             
-            if line.startswith('FILE:'):
-                if current_comment:
-                    # Save previous comment if complete
-                    if all(k in current_comment for k in ['file', 'line', 'comment']):
-                        comments.append(ReviewComment(
-                            file_path=current_comment['file'],
-                            line_number=current_comment['line'],
-                            body=current_comment['comment'],
-                            severity=current_comment.get('severity', 'info')
-                        ))
+            if stripped_line.startswith('FILE:'):
+                # Save previous comment if complete
+                if current_comment and self._is_comment_complete(current_comment):
+                    comment = self._create_review_comment(current_comment, original_lines, suggested_lines)
+                    if comment:
+                        comments.append(comment)
+                
+                # Reset for new comment
+                current_comment = {}
+                original_lines = []
+                suggested_lines = []
+                capturing_original = False
+                capturing_suggested = False
                 
                 # Start new comment
-                filename = line.replace('FILE:', '').strip()
+                filename = stripped_line.replace('FILE:', '').strip()
                 # Validate file exists in the PR
                 if filename in file_names:
                     current_comment = {'file': filename}
                 else:
+                    logger.debug(f"⚠️ Skipping invalid file: {filename}")
                     current_comment = {}  # Skip invalid files
                     
-            elif line.startswith('LINE:') and current_comment:
+            elif stripped_line.startswith('LINE:') and current_comment:
                 try:
-                    line_num = int(line.replace('LINE:', '').strip())
+                    line_num = int(stripped_line.replace('LINE:', '').strip())
                     current_comment['line'] = line_num
                 except ValueError:
                     current_comment['line'] = 1  # Default to line 1 if parsing fails
                     
-            elif line.startswith('SEVERITY:') and current_comment:
-                severity = line.replace('SEVERITY:', '').strip().lower()
+            elif stripped_line.startswith('END_LINE:') and current_comment:
+                try:
+                    end_line_num = int(stripped_line.replace('END_LINE:', '').strip())
+                    current_comment['end_line'] = end_line_num
+                except ValueError:
+                    logger.debug("⚠️ Failed to parse END_LINE")
+                    
+            elif stripped_line.startswith('SEVERITY:') and current_comment:
+                severity = stripped_line.replace('SEVERITY:', '').strip().lower()
                 if severity in ['warning', 'error', 'info']:
                     current_comment['severity'] = severity
                     
-            elif line.startswith('COMMENT:') and current_comment:
-                comment_text = line.replace('COMMENT:', '').strip()
+            elif stripped_line.startswith('COMMENT:') and current_comment:
+                comment_text = stripped_line.replace('COMMENT:', '').strip()
                 current_comment['comment'] = comment_text
+                
+            elif stripped_line.startswith('ORIGINAL_CODE:') and current_comment:
+                capturing_original = True
+                capturing_suggested = False
+                original_lines = []
+                
+            elif stripped_line.startswith('SUGGESTED_CODE:') and current_comment:
+                capturing_original = False
+                capturing_suggested = True
+                suggested_lines = []
+                
+            elif capturing_original:
+                # Stop capturing if we hit another keyword or empty line pattern
+                if (stripped_line.startswith(('FILE:', 'LINE:', 'SEVERITY:', 'COMMENT:', 'SUGGESTED_CODE:', 'END_LINE:')) or 
+                    (not stripped_line and len(original_lines) > 0)):
+                    capturing_original = False
+                    # Re-process this line since it's not part of original code
+                    continue
+                else:
+                    original_lines.append(line)  # Keep original indentation
+                    
+            elif capturing_suggested:
+                # Stop capturing if we hit another keyword or empty line pattern
+                if (stripped_line.startswith(('FILE:', 'LINE:', 'SEVERITY:', 'COMMENT:', 'ORIGINAL_CODE:', 'END_LINE:')) or 
+                    (not stripped_line and len(suggested_lines) > 0)):
+                    capturing_suggested = False
+                    # Re-process this line since it's not part of suggested code
+                    continue
+                else:
+                    suggested_lines.append(line)  # Keep original indentation
         
         # Don't forget the last comment
-        if current_comment and all(k in current_comment for k in ['file', 'line', 'comment']):
-            comments.append(ReviewComment(
-                file_path=current_comment['file'],
-                line_number=current_comment['line'],
-                body=current_comment['comment'],
-                severity=current_comment.get('severity', 'info')
-            ))
+        if current_comment and self._is_comment_complete(current_comment):
+            comment = self._create_review_comment(current_comment, original_lines, suggested_lines)
+            if comment:
+                comments.append(comment)
         
         # If structured parsing didn't work well, fall back to extracting insights
         if len(comments) < 2:
@@ -268,7 +336,50 @@ Provide 3-8 specific comments covering different aspects, with exact file names 
             comments.extend(self._extract_fallback_comments(analysis, files[:5]))
         
         logger.info(f"✅ Parsed {len(comments)} comments from analysis")
+        # Count suggestions
+        suggestions_count = sum(1 for comment in comments if comment.has_suggestion())
+        if suggestions_count > 0:
+            logger.info(f"✨ {suggestions_count} comments include code suggestions")
+        
         return comments[:8]  # Limit to 8 comments max
+
+    def _is_comment_complete(self, comment_dict: dict) -> bool:
+        """Check if a comment has the minimum required fields"""
+        return all(k in comment_dict for k in ['file', 'line', 'comment'])
+
+    def _create_review_comment(self, comment_dict: dict, original_lines: List[str], suggested_lines: List[str]) -> ReviewComment:
+        """Create a ReviewComment object from parsed data"""
+        if not self._is_comment_complete(comment_dict):
+            return None
+            
+        # Determine if this is a suggestion
+        has_suggestion = len(original_lines) > 0 and len(suggested_lines) > 0
+        
+        # Clean up code blocks (remove extra whitespace/empty lines)
+        original_code = None
+        suggested_code = None
+        suggestion_type = None
+        
+        if has_suggestion:
+            original_code = '\n'.join(original_lines).strip()
+            suggested_code = '\n'.join(suggested_lines).strip()
+            
+            # Determine suggestion type
+            if comment_dict.get('end_line') and comment_dict['end_line'] > comment_dict['line']:
+                suggestion_type = "multi_line"
+            else:
+                suggestion_type = "single_line"
+        
+        return ReviewComment(
+            file_path=comment_dict['file'],
+            line_number=comment_dict['line'],
+            body=comment_dict['comment'],
+            severity=comment_dict.get('severity', 'info'),
+            suggestion_type=suggestion_type,
+            original_code=original_code,
+            suggested_code=suggested_code,
+            end_line_number=comment_dict.get('end_line')
+        )
     
     def _extract_fallback_comments(self, analysis: str, files: List[dict]) -> List[ReviewComment]:
         """Fallback method to extract comments when structured parsing fails"""
