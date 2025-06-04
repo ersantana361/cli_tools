@@ -8,6 +8,23 @@ This script can be executed directly by Claude CLI when you ask it to review PRs
 import sys
 import logging
 
+# Direct imports - will fail immediately if dependencies are missing
+from github import Github
+import requests
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+
+# Handle import from different locations (direct execution vs import from mcp/)
+try:
+    from pr_reviewer import ClaudeIntegratedPRReviewer
+except ImportError:
+    # If importing from mcp/ subdirectory, try parent directory
+    import sys
+    from pathlib import Path
+    parent_dir = Path(__file__).parent.parent
+    sys.path.insert(0, str(parent_dir))
+    from pr_reviewer import ClaudeIntegratedPRReviewer
+
 # Set up detailed logging
 logging.basicConfig(
     level=logging.DEBUG,
@@ -17,25 +34,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-# Import the PR reviewer from the package
-try:
-    print("🔄 Importing dependencies...")
-    from github import Github
-    import requests
-    print("✅ GitHub imports successful")
-    
-    from langchain_openai import ChatOpenAI
-    from langchain_anthropic import ChatAnthropic
-    print("✅ LangChain imports successful")
-    
-    from pr_reviewer import ClaudeIntegratedPRReviewer
-    print("✅ PR Reviewer package imports successful")
-    
-except ImportError as e:
-    print(f"❌ Import Error: {e}")
-    print("📦 Install missing dependencies with: pip install PyGithub langchain-openai langchain-anthropic requests")
-    logger.error(f"Import failed: {e}")
 
 def main():
     """Main function for Claude CLI integration"""

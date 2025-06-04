@@ -5,31 +5,11 @@ MCP Server for PR Review Tool using FastMCP style
 
 import sys
 import io
-import contextlib
 from typing import Optional
 
-try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError:
-    try:
-        from mcp import FastMCP
-    except ImportError:
-        print("Could not import FastMCP. Please ensure the correct MCP SDK is installed.")
-        print("You might need to run: pip install \"mcp[cli]\" or check the specific MCP Python SDK documentation.")
-        sys.exit(1)
-
-try:
-    from claude_integrated_pr_review import ClaudeIntegratedPRReviewer
-    print("Successfully imported ClaudeIntegratedPRReviewer.")
-except ImportError as e:
-    print(f"Failed to import ClaudeIntegratedPRReviewer: {e}")
-    print("Make sure claude_integrated_pr_review.py is in the same directory or your Python path.")
-    print("This script will continue with a placeholder if it's not found, but the tool will error.")
-    class ClaudeIntegratedPRReviewer:
-        def execute_review(self, command: dict) -> bool:
-            print(f"Placeholder ClaudeIntegratedPRReviewer: execute_review called with {command}")
-            print("Please ensure the real ClaudeIntegratedPRReviewer is available.")
-            return False
+# Direct imports - will fail immediately if not available
+from mcp.server.fastmcp import FastMCP
+from claude_integrated_pr_review import ClaudeIntegratedPRReviewer
 
 # Store name and description in variables if you want to print them
 server_name_variable = "pr-review-tool-server"

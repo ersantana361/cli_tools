@@ -39,7 +39,8 @@ class GitHubAPI:
         """Get GitHub token from environment"""
         logger.debug("🔍 Looking for GitHub token in environment variables...")
         
-        token_vars = ["GITHUB_TOKEN_WORK", "GITHUB_TOKEN", "GITHUB_TOKEN_PERSONAL"]
+        #token_vars = ["GITHUB_TOKEN_WORK", "GITHUB_TOKEN", "GITHUB_TOKEN_PERSONAL"]
+        token_vars = ["GITHUB_TOKEN_PERSONAL"]
         for var in token_vars:
             token = os.getenv(var)
             if token:

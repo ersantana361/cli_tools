@@ -10,7 +10,7 @@ from .llm_analyzer import LLMAnalyzer
 from .reviewer import ClaudeIntegratedPRReviewer
 
 __version__ = "1.0.0"
-__author__ = "Claude AI Assistant"
+__author__ = "Erick Santana"
 
 __all__ = [
     "ReviewComment",

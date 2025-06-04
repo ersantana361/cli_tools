@@ -2,7 +2,6 @@
 Main PR reviewer class that orchestrates the review process.
 """
 
-import os
 import re
 import json
 import logging
