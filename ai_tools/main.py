@@ -5,10 +5,14 @@ from tools.youtube_agent import run_youtube
 from tools.pdf_converter import run_conversion
 
 def validate_slack_args(args):
-    """Ensure Slack thread is provided when target is slack"""
+    """Ensure Slack thread or channel is provided when target is slack"""
     if args.command == "youtube" and args.target == "slack":
-        if not args.slack_thread:
-            raise ValueError("Slack thread URL required for 'slack' target")
+        if not args.slack_thread and not args.slack_channel:
+            raise ValueError("Either --slack-thread URL or --slack-channel name required for 'slack' target")
+        if args.slack_thread and args.slack_channel:
+            raise ValueError("Use either --slack-thread or --slack-channel, not both")
+        # When using slack target, video URL can be auto-extracted from thread/channel
+        # No need to validate video URL here - let youtube_agent handle it
 
 def main():
     parser = argparse.ArgumentParser(
@@ -53,11 +57,14 @@ When using Slack target:
   
 Examples:
   Markdown: youtube "https://youtu.be/VIDEO_ID" --target markdown
-  Slack:    youtube "https://youtu.be/VIDEO_ID" --target slack --slack-thread URL"""
+  Slack:    youtube "https://youtu.be/VIDEO_ID" --target slack --slack-thread URL
+  Auto-extract from thread: youtube --target slack --slack-thread URL
+  Auto-extract from channel: youtube --target slack --slack-channel erick-chatbot-room"""
     )
     youtube_parser.add_argument(
         "video",
-        help="YouTube URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID)"
+        nargs="?",  # Make video argument optional
+        help="YouTube URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID). Optional when using --target slack (will be auto-extracted from thread)"
     )
     youtube_parser.add_argument(
         "--language", 
@@ -74,6 +81,15 @@ Examples:
     youtube_parser.add_argument(
         "--slack-thread",
         help="Slack thread URL (required for 'slack' target)"
+    )
+    youtube_parser.add_argument(
+        "--slack-channel",
+        help="Slack channel name to get latest message from (alternative to --slack-thread)"
+    )
+    youtube_parser.add_argument(
+        "--ask-for-url",
+        action="store_true",
+        help="Prompt for YouTube URL input (workaround for Slack permission issues)"
     )
     youtube_parser.add_argument(
         "--prompt-only",
@@ -124,6 +140,8 @@ Examples:
                 prompt_only=args.prompt_only,
                 dynamic_tags=args.dynamic_tags,
                 slack_thread_url=args.slack_thread,
+                slack_channel_name=args.slack_channel,
+                ask_for_url=args.ask_for_url,
                 llm_provider=args.llm_provider # Pass the new argument
             )
 

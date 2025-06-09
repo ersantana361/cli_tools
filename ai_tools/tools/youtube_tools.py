@@ -7,6 +7,162 @@ from smolagents import tool
 from tools.youtube_utils import extract_video_id, get_video_title, format_time
 
 @tool
+def fetch_youtube_transcript(video_url: str, language: str = "en") -> dict:
+    """
+    Standalone function to fetch YouTube transcript for debugging purposes.
+    
+    Args:
+        video_url: YouTube video URL or ID
+        language: Language code (e.g. "en")
+        
+    Returns:
+        dict: Contains transcript_text, video_title, selected_language, and status info
+    """
+    console = Console()
+    result = {
+        "video_url": video_url,
+        "requested_language": language,
+        "video_title": "Unknown Title",
+        "transcript_text": "",
+        "selected_language": None,
+        "status": "failed",
+        "error": None,
+        "attempts": []
+    }
+    
+    try:
+        console.print(f"[cyan]🔍 Fetching transcript for: {video_url}[/cyan]")
+        
+        # Extract video ID
+        video_id = extract_video_id(video_url)
+        console.print(f"[green]✅ Extracted video ID: {video_id}[/green]")
+        
+        if not video_id:
+            result["error"] = "Could not extract video ID from URL"
+            return result
+            
+        # Get video title
+        try:
+            video_title = get_video_title(video_id)
+            result["video_title"] = video_title
+            console.print(f"[green]✅ Video title: {video_title}[/green]")
+        except Exception as title_e:
+            console.print(f"[yellow]⚠️ Could not get title: {title_e}[/yellow]")
+            
+        # List available transcripts
+        console.print(f"[cyan]🔍 Listing available transcripts...[/cyan]")
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        
+        # Show all available transcripts
+        available_transcripts = list(transcript_list)
+        console.print(f"[green]✅ Found {len(available_transcripts)} transcript(s):[/green]")
+        
+        for i, transcript in enumerate(available_transcripts):
+            is_generated = transcript.is_generated
+            console.print(f"  {i+1}. {transcript.language} ({transcript.language_code}) - {'Generated' if is_generated else 'Manual'}")
+            result["attempts"].append({
+                "language": transcript.language,
+                "language_code": transcript.language_code,
+                "is_generated": is_generated,
+                "available": True
+            })
+            
+        # Strategy 1: Try requested language (manual first, then generated)
+        console.print(f"\n[cyan]🎯 Trying requested language: {language}[/cyan]")
+        target_transcript = None
+        
+        try:
+            target_transcript = transcript_list.find_transcript([language])
+            result["selected_language"] = language
+            console.print(f"[green]✅ Found manual transcript for {language}[/green]")
+        except NoTranscriptFound:
+            console.print(f"[yellow]⚠️ No manual transcript for {language}[/yellow]")
+            try:
+                target_transcript = transcript_list.find_generated_transcript([language])
+                result["selected_language"] = language
+                console.print(f"[green]✅ Found generated transcript for {language}[/green]")
+            except NoTranscriptFound:
+                console.print(f"[red]❌ No transcript found for {language}[/red]")
+        
+        # Strategy 2: Try English if not already tried
+        if target_transcript is None and language != 'en':
+            console.print(f"\n[cyan]🎯 Trying English fallback...[/cyan]")
+            try:
+                target_transcript = transcript_list.find_transcript(['en'])
+                result["selected_language"] = 'en'
+                console.print("[green]✅ Found manual English transcript[/green]")
+            except NoTranscriptFound:
+                try:
+                    target_transcript = transcript_list.find_generated_transcript(['en'])
+                    result["selected_language"] = 'en'
+                    console.print("[green]✅ Found generated English transcript[/green]")
+                except NoTranscriptFound:
+                    console.print("[red]❌ No English transcript found[/red]")
+        
+        # Strategy 3: Use first available transcript
+        if target_transcript is None and available_transcripts:
+            console.print(f"\n[cyan]🎯 Trying first available transcript...[/cyan]")
+            target_transcript = available_transcripts[0]
+            result["selected_language"] = target_transcript.language_code
+            console.print(f"[yellow]⚠️ Using any available: {target_transcript.language_code}[/yellow]")
+        
+        if target_transcript is None:
+            result["error"] = "No transcripts available for this video"
+            console.print("[red]❌ No transcripts available[/red]")
+            return result
+            
+        # Fetch transcript data
+        console.print(f"\n[cyan]📥 Fetching transcript data for {result['selected_language']}...[/cyan]")
+        
+        for attempt in range(3):
+            try:
+                console.print(f"[dim]Attempt {attempt + 1}/3...[/dim]")
+                transcript_data = target_transcript.fetch()
+                
+                # Format transcript
+                transcript_entries = [
+                    f"{format_time(entry['start'])}: {entry['text']}" 
+                    for entry in transcript_data
+                ]
+                result["transcript_text"] = "\n".join(transcript_entries)
+                result["status"] = "success"
+                
+                console.print(f"[green]✅ Successfully fetched {len(transcript_entries)} entries![/green]")
+                console.print(f"[dim]Total characters: {len(result['transcript_text'])}[/dim]")
+                console.print(f"[dim]First entry: {transcript_entries[0] if transcript_entries else 'None'}[/dim]")
+                
+                return result
+                
+            except Exception as fetch_e:
+                console.print(f"[red]❌ Attempt {attempt + 1} failed: {fetch_e}[/red]")
+                result["attempts"].append({
+                    "attempt": attempt + 1,
+                    "error": str(fetch_e),
+                    "language_code": result['selected_language']
+                })
+                
+                if attempt == 2:  # Last attempt
+                    result["error"] = f"All fetch attempts failed: {fetch_e}"
+                    console.print(f"[red]🚫 All attempts failed for {result['selected_language']}[/red]")
+                else:
+                    import time
+                    time.sleep(1)  # Brief delay before retry
+        
+    except TranscriptsDisabled:
+        error_msg = "Transcripts are disabled for this video"
+        result["error"] = error_msg
+        console.print(f"[red]🚫 {error_msg}[/red]")
+    except Exception as e:
+        error_msg = f"Unexpected error: {e}"
+        result["error"] = error_msg
+        console.print(f"[red]🚫 {error_msg}[/red]")
+        import traceback
+        console.print("[red]Full traceback:[/red]")
+        traceback.print_exc()
+    
+    return result
+
+@tool
 def analyze_video(video_url: str, language: str, target: str, prompt_only: bool, llm: ChatOpenAI) -> dict:
     """
     Analyzes a YouTube video transcript and produces structured analysis.
@@ -116,7 +272,52 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
                                 except Exception:
                                     continue
                         if fetched_transcript_data is None:
-                            return {"video_title": video_title, "analysis": f"Error: Could not fetch any transcript. XML parsing consistently fails. Details: {fetch_e}"}
+                            # Interactive prompt for handling no transcript
+                            from rich.prompt import Confirm, Prompt
+                            from rich.panel import Panel
+                            
+                            # Make sure any progress indicators are stopped
+                            console.print()  # New line to clear any spinners
+                            import sys
+                            sys.stdout.flush()  # Flush output buffer
+                            console.print(Panel.fit(
+                                "[yellow]⚠️ No Transcript Available[/yellow]\n\n"
+                                "This video doesn't have usable captions/transcripts.\n"
+                                "You can either:\n"
+                                "• Continue with video title and URL only\n"
+                                "• Provide a manual transcript/summary",
+                                title="[bold yellow]Transcript Issue[/bold yellow]",
+                                border_style="yellow"
+                            ))
+                            
+                            # Create a fresh console instance for prompts
+                            from rich.console import Console as FreshConsole
+                            prompt_console = FreshConsole()
+                            
+                            use_manual = Confirm.ask(
+                                "[bold cyan]Would you like to provide a manual transcript or summary?[/bold cyan]",
+                                console=prompt_console,
+                                default=False
+                            )
+                            
+                            if use_manual:
+                                prompt_console.print("\n[cyan]💡 You can paste the video description, your notes, or a brief summary[/cyan]")
+                                manual_text = Prompt.ask(
+                                    "[bold cyan]Please paste your transcript/summary[/bold cyan]",
+                                    console=prompt_console,
+                                    default=""
+                                )
+                                if manual_text.strip():
+                                    transcript_text = manual_text.strip()
+                                    console.print(Panel.fit(
+                                        f"✅ Using manual input ({len(transcript_text)} characters)",
+                                        border_style="green"
+                                    ))
+                                else:
+                                    transcript_text = f"Video: {video_title}\nURL: {video_url}\nNote: No transcript available"
+                            else:
+                                console.print("[dim]User declined manual input - exiting[/dim]")
+                                return {"video_title": video_title, "analysis": "Error: No transcript available and user declined manual input."}
                     except Exception as final_e:
                         return {"video_title": video_title, "analysis": f"Error: All transcript retrieval strategies failed. Details: {final_e}"}
                 else:
@@ -161,19 +362,104 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
                 transcript_text = "\n".join(transcript_entries)
                 console.print(f"[green]Successfully retrieved fallback transcript ({len(transcript_entries)} entries)[/green]")
             else:
-                return {"video_title": video_title, "analysis": f"Error: No transcripts available for this video. Details: {e}"}
+                # Interactive prompt for no transcripts available
+                from rich.prompt import Confirm, Prompt
+                from rich.panel import Panel
+                
+                # Make sure any progress indicators are stopped
+                console.print()  # New line to clear any spinners
+                import sys
+                sys.stdout.flush()  # Flush output buffer
+                console.print(Panel.fit(
+                    "[yellow]⚠️ No Transcript Available[/yellow]\n\n"
+                    "This video doesn't have any captions/transcripts.\n"
+                    "You can either:\n"
+                    "• Continue with video title and URL only\n"
+                    "• Provide a manual transcript/summary",
+                    title="[bold yellow]Transcript Issue[/bold yellow]",
+                    border_style="yellow"
+                ))
+                
+                # Create a fresh console instance for prompts
+                from rich.console import Console as FreshConsole
+                prompt_console = FreshConsole()
+                
+                use_manual = Confirm.ask(
+                    "[bold cyan]Would you like to provide a manual transcript or summary?[/bold cyan]",
+                    console=prompt_console,
+                    default=False
+                )
+                
+                if use_manual:
+                    prompt_console.print("\n[cyan]💡 You can paste the video description, your notes, or a brief summary[/cyan]")
+                    manual_text = Prompt.ask(
+                        "[bold cyan]Please paste your transcript/summary[/bold cyan]",
+                        console=prompt_console,
+                        default=""
+                    )
+                    if manual_text.strip():
+                        transcript_text = manual_text.strip()
+                        console.print(Panel.fit(
+                            f"✅ Using manual input ({len(transcript_text)} characters)",
+                            border_style="green"
+                        ))
+                    else:
+                        transcript_text = f"Video: {video_title}\nURL: {video_url}\nNote: No transcript available"
+                else:
+                    console.print("[dim]User declined manual input - exiting[/dim]")
+                    return {"video_title": video_title, "analysis": "Error: No transcript available and user declined manual input."}
         except Exception as final_e:
             console.print(f"[red]Final fallback also failed: {final_e}[/red]")
-            return {"video_title": video_title, "analysis": f"Error: All transcript retrieval methods failed. Details: {e}"}
+            # Interactive prompt as last resort
+            from rich.prompt import Confirm, Prompt
+            from rich.panel import Panel
+            
+            # Make sure any progress indicators are stopped
+            console.print()  # New line to clear any spinners
+            import sys
+            sys.stdout.flush()  # Flush output buffer
+            console.print(Panel.fit(
+                "[red]🚫 Transcript Fetch Failed[/red]\n\n"
+                f"All transcript retrieval methods failed.\n"
+                f"Error: {e}\n\n"
+                "You can still continue by providing manual content.",
+                title="[bold red]Error[/bold red]",
+                border_style="red"
+            ))
+            
+            # Create a fresh console instance for prompts
+            from rich.console import Console as FreshConsole
+            prompt_console = FreshConsole()
+            
+            use_manual = Confirm.ask(
+                "[bold cyan]Would you like to provide manual content instead?[/bold cyan]",
+                console=prompt_console,
+                default=False
+            )
+            
+            if use_manual:
+                manual_text = Prompt.ask(
+                    "[bold cyan]Please paste your transcript/summary[/bold cyan]",
+                    console=prompt_console,
+                    default=""
+                )
+                if manual_text.strip():
+                    transcript_text = manual_text.strip()
+                else:
+                    transcript_text = f"Video: {video_title}\nURL: {video_url}\nNote: Transcript fetch failed"
+            else:
+                console.print("[dim]User declined manual input - exiting[/dim]")
+                return {"video_title": video_title, "analysis": "Error: No transcript available and user declined manual input."}
 
     if not transcript_text:
-        console.print("[yellow]Warning: Transcript text is empty. Analysis might be based on missing data.[/yellow]")
-        # Check if we got here via fallback and have some data
-        if 'transcript_entries' in locals() and transcript_entries:
-            transcript_text = "\n".join(transcript_entries)
-        # Allow proceeding, but prompt will indicate transcript unavailability
+        console.print("[red]🚫 No transcript data available - cannot proceed with analysis[/red]")
+        return {"video_title": video_title, "analysis": "Error: No transcript data available for analysis."}
 
-    prompt_text = f"""Analyze this YouTube video transcript and provide a structured breakdown:
+    # Adjust prompt based on available content
+    has_actual_transcript = transcript_text and not transcript_text.startswith("Video:") and "No transcript available" not in transcript_text
+    
+    if has_actual_transcript:
+        prompt_text = f"""Analyze this YouTube video transcript and provide a structured breakdown:
 
 *Introduction*
 - Key objectives of the video
@@ -199,7 +485,34 @@ Formatting Rules for {"Slack" if target == "slack" else "Markdown"}:
 - Clean, professional formatting
 
 [TRANSCRIPT]
-{transcript_text if transcript_text else "Transcript not available."}
+{transcript_text}
+"""
+    else:
+        prompt_text = f"""Analyze this YouTube video based on available information:
+
+Video Title: {video_title}
+
+Since no transcript is available, provide a structured response based on the title and any provided context:
+
+*Video Overview*
+- Likely objectives based on the title
+- Potential target audience
+- Expected content themes
+
+*Analysis Approach*
+- What viewers might learn from this video
+- Key topics likely covered
+- Relevant technical areas
+
+*Recommendations*
+- How to get the most value from this video
+- Related topics to explore
+- Next steps for learning
+
+Note: Analysis is based on title only since transcript is unavailable.
+
+[AVAILABLE CONTENT]
+{transcript_text if transcript_text else f"Video Title: {video_title}"}
 """
     
     if prompt_only:
