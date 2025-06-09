@@ -53,6 +53,24 @@ def run_youtube(
         video_title = analysis_result.get("video_title", "Untitled Video")
         output_body = analysis_result.get("prompt") if prompt_only else analysis_result.get("analysis")
 
+        # Check if analysis failed - don't proceed with Slack posting if there's an error
+        if output_body and output_body.startswith("Error:"):
+            console.print(f"[red]🚫 Analysis failed: {output_body}[/red]")
+            return {
+                "video_title": video_title,
+                "status": "failed",
+                "error": output_body
+            }
+
+        # Check if we have valid content to post
+        if not output_body or len(output_body.strip()) == 0:
+            console.print("[red]🚫 No content generated for analysis[/red]")
+            return {
+                "video_title": video_title,
+                "status": "failed", 
+                "error": "No content generated"
+            }
+
         # Handle output based on target
         if target.lower() == "slack":
             # Clean content for Slack
@@ -73,13 +91,29 @@ def run_youtube(
             formatted_slack = format_for_slack(slack_content, "analysis")
             
             # Post to Slack thread
-            post_to_slack(
+            slack_result = post_to_slack(
                 content=formatted_slack,
                 slack_link=slack_thread_url,
                 title=video_title,
                 content_type="analysis"
             )
-            console.print(f"[green]✅ Successfully posted to Slack thread[/green]")
+            
+            # Only report success if the operation actually succeeded
+            if slack_result.get("success", False):
+                console.print(f"[green]✅ Successfully posted to Slack thread[/green]")
+                return {
+                    "video_title": video_title,
+                    "status": "success",
+                    "slack_result": slack_result
+                }
+            else:
+                error_msg = slack_result.get("error", "Unknown error")
+                console.print(f"[red]🚫 Failed to post to Slack: {error_msg}[/red]")
+                return {
+                    "video_title": video_title,
+                    "status": "failed",
+                    "error": error_msg
+                }
             
         else: # markdown output
             # Generate Markdown output
@@ -97,6 +131,12 @@ tags:
             pyperclip.copy(final_output)
             console.print(Panel(f"Video Title: {video_title}", title="Analysis Complete", expand=False))
             console.print(Markdown(final_output))
+            
+            return {
+                "video_title": video_title,
+                "status": "success",
+                "content": final_output
+            }
 
     except ValueError as e:
         console.print(f"[red]🚫 Validation Error: {e}[/red]")

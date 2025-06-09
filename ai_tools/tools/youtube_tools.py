@@ -1,11 +1,9 @@
 from rich.console import Console
 import re
-import traceback # Import the traceback module
+import traceback
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, CouldNotRetrieveTranscript
 from langchain_openai import ChatOpenAI
 from smolagents import tool
-# Assuming these are in a file named 'youtube_utils.py' within a 'tools' directory
-# and you've confirmed their implementations.
 from tools.youtube_utils import extract_video_id, get_video_title, format_time
 
 @tool
@@ -47,23 +45,94 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
         
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
         
+        # Smart transcript selection with multiple fallback strategies
         target_transcript_object = None
+        selected_language = None
+        
+        # Strategy 1: Try requested language (manual first, then generated)
         try:
             target_transcript_object = transcript_list.find_transcript([language])
+            selected_language = language
+            console.print(f"[green]Found manual transcript for {language}[/green]")
         except NoTranscriptFound:
             try:
                 target_transcript_object = transcript_list.find_generated_transcript([language])
+                selected_language = language
+                console.print(f"[green]Found generated transcript for {language}[/green]")
             except NoTranscriptFound:
-                console.print(f"[red]🚫 Error: No transcript found for video ID {video_id} in language '{language}' or its fallbacks.[/red]")
-                return {"video_title": video_title, "analysis": f"Error: Transcript not found for language '{language}'."}
+                console.print(f"[yellow]No transcript found for {language}, trying fallbacks...[/yellow]")
         
-        fetched_transcript_data = target_transcript_object.fetch()
+        # Strategy 2: If requested language fails and isn't English, try English
+        if target_transcript_object is None and language != 'en':
+            try:
+                target_transcript_object = transcript_list.find_transcript(['en'])
+                selected_language = 'en'
+                console.print("[green]Found manual English transcript as fallback[/green]")
+            except NoTranscriptFound:
+                try:
+                    target_transcript_object = transcript_list.find_generated_transcript(['en'])
+                    selected_language = 'en'
+                    console.print("[green]Found generated English transcript as fallback[/green]")
+                except NoTranscriptFound:
+                    console.print("[yellow]No English transcript found either...[/yellow]")
         
-        transcript_entries = [
-            f"{format_time(entry['start'])}: {entry['text']}" 
-            for entry in fetched_transcript_data
-        ]
-        transcript_text = "\n".join(transcript_entries)
+        # Strategy 3: Use any available transcript as last resort
+        if target_transcript_object is None:
+            try:
+                available_transcripts = list(transcript_list)
+                if available_transcripts:
+                    target_transcript_object = available_transcripts[0]
+                    selected_language = target_transcript_object.language_code
+                    console.print(f"[yellow]Using any available transcript: {selected_language}[/yellow]")
+                else:
+                    console.print(f"[red]🚫 Error: No transcripts available for video ID {video_id}[/red]")
+                    return {"video_title": video_title, "analysis": "Error: No transcripts available for this video."}
+            except Exception as list_e:
+                console.print(f"[red]🚫 Error listing transcripts: {list_e}[/red]")
+                return {"video_title": video_title, "analysis": f"Error: Could not list available transcripts. Details: {list_e}"}
+        
+        # Fetch transcript data with multiple retry strategies
+        fetched_transcript_data = None
+        for attempt in range(3):  # Try up to 3 times
+            try:
+                console.print(f"[green]Fetching transcript data (attempt {attempt + 1}/3)...[/green]")
+                fetched_transcript_data = target_transcript_object.fetch()
+                break  # Success, exit retry loop
+            except Exception as fetch_e:
+                console.print(f"[yellow]Attempt {attempt + 1} failed: {fetch_e}[/yellow]")
+                if attempt == 2:  # Last attempt
+                    console.print(f"[red]🚫 All transcript fetch attempts failed for {selected_language}[/red]")
+                    # Try one more fallback - get any other available transcript
+                    try:
+                        available_transcripts = list(transcript_list)
+                        for alt_transcript in available_transcripts:
+                            if alt_transcript.language_code != selected_language:
+                                console.print(f"[yellow]Trying alternative transcript: {alt_transcript.language_code}[/yellow]")
+                                try:
+                                    fetched_transcript_data = alt_transcript.fetch()
+                                    selected_language = alt_transcript.language_code
+                                    console.print(f"[green]Successfully fetched {selected_language} transcript![/green]")
+                                    break
+                                except Exception:
+                                    continue
+                        if fetched_transcript_data is None:
+                            return {"video_title": video_title, "analysis": f"Error: Could not fetch any transcript. XML parsing consistently fails. Details: {fetch_e}"}
+                    except Exception as final_e:
+                        return {"video_title": video_title, "analysis": f"Error: All transcript retrieval strategies failed. Details: {final_e}"}
+                else:
+                    import time
+                    time.sleep(1)  # Brief delay before retry
+        
+        if fetched_transcript_data:
+            transcript_entries = [
+                f"{format_time(entry['start'])}: {entry['text']}" 
+                for entry in fetched_transcript_data
+            ]
+            transcript_text = "\n".join(transcript_entries)
+            console.print(f"[green]Successfully processed {len(transcript_entries)} transcript entries in {selected_language}[/green]")
+        else:
+            transcript_text = ""
+            console.print("[yellow]No transcript data available[/yellow]")
 
     except TranscriptsDisabled:
         console.print(f"[red]🚫 Error: Transcripts are disabled for video ID: {video_id}[/red]")
@@ -75,10 +144,33 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
         console.print(f"[red]🚫 Error during video processing or transcript fetching for '{video_url}': {e}[/red]")
         console.print("[red]Full stack trace:[/red]")
         traceback.print_exc() # Print the full stack trace
-        return {"video_title": video_title, "analysis": f"Error: An unexpected error occurred while processing the video transcript. Details: {e}"}
+        
+        # Try one more fallback - manual transcript retrieval without language preference
+        try:
+            console.print("[yellow]Attempting final fallback - any available transcript...[/yellow]")
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            available_transcripts = list(transcript_list)
+            if available_transcripts:
+                any_transcript = available_transcripts[0]
+                console.print(f"[yellow]Using any available transcript: {any_transcript.language_code}[/yellow]")
+                fetched_transcript_data = any_transcript.fetch()
+                transcript_entries = [
+                    f"{format_time(entry['start'])}: {entry['text']}" 
+                    for entry in fetched_transcript_data
+                ]
+                transcript_text = "\n".join(transcript_entries)
+                console.print(f"[green]Successfully retrieved fallback transcript ({len(transcript_entries)} entries)[/green]")
+            else:
+                return {"video_title": video_title, "analysis": f"Error: No transcripts available for this video. Details: {e}"}
+        except Exception as final_e:
+            console.print(f"[red]Final fallback also failed: {final_e}[/red]")
+            return {"video_title": video_title, "analysis": f"Error: All transcript retrieval methods failed. Details: {e}"}
 
     if not transcript_text:
         console.print("[yellow]Warning: Transcript text is empty. Analysis might be based on missing data.[/yellow]")
+        # Check if we got here via fallback and have some data
+        if 'transcript_entries' in locals() and transcript_entries:
+            transcript_text = "\n".join(transcript_entries)
         # Allow proceeding, but prompt will indicate transcript unavailability
 
     prompt_text = f"""Analyze this YouTube video transcript and provide a structured breakdown:
