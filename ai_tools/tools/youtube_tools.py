@@ -83,8 +83,6 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
 
     prompt_text = f"""Analyze this YouTube video transcript and provide a structured breakdown:
 
-*{video_title}*
-
 *Introduction*
 - Key objectives of the video
 - Core themes and methodologies
@@ -101,11 +99,12 @@ For each significant segment:
 - Practical applications
 - Long-term recommendations
 
-Formatting Rules:
+Formatting Rules for {"Slack" if target == "slack" else "Markdown"}:
 - Use bullet points (•) for lists
-- Avoid markdown formatting
-- Never include URLs
+- Use *bold* for headers and emphasis
+- Never include URLs or video title in output
 - Keep excerpts under 20 words
+- Clean, professional formatting
 
 [TRANSCRIPT]
 {transcript_text if transcript_text else "Transcript not available."}
