@@ -55,26 +55,20 @@ def run_youtube(
 
         # Handle output based on target
         if target.lower() == "slack":
-            # Clean and format content
-            cleaned_content = re.sub(
-                r'\*\*Video Analysis:\*\*.*?\n', 
-                '', 
-                output_body, 
-                flags=re.DOTALL
-            )
-            cleaned_content = re.sub(
-                re.escape(video), 
-                '', 
-                cleaned_content
-            )
+            # Clean content for Slack
+            cleaned_content = output_body
             
-            # Build Slack message structure
-            slack_content = f"*{video_title}*\n\n{cleaned_content}"
+            # Remove common analysis headers and titles
+            cleaned_content = re.sub(r'\*\*Video Analysis:\*\*.*?\n', '', cleaned_content, flags=re.DOTALL)
+            cleaned_content = re.sub(r'^\*.*?\*\s*\n\n', '', cleaned_content, flags=re.MULTILINE)  # Remove title lines
+            cleaned_content = re.sub(re.escape(video), '', cleaned_content)  # Remove URL
+            cleaned_content = re.sub(re.escape(video_title), '', cleaned_content)  # Remove title text
             
-            # Remove residual markdown artifacts
-            slack_content = re.sub(r'\*\*(.*?)\*\*', r'*\1*', slack_content)
-            slack_content = re.sub(r'__([^_]+)__', r'_\1_', slack_content)
-            slack_content = re.sub(r'^-{3,}$', '', slack_content, flags=re.MULTILINE)
+            # Clean markdown formatting for Slack
+            slack_content = re.sub(r'\*\*(.*?)\*\*', r'*\1*', cleaned_content)  # Bold
+            slack_content = re.sub(r'__([^_]+)__', r'_\1_', slack_content)      # Italic  
+            slack_content = re.sub(r'^-{3,}$', '', slack_content, flags=re.MULTILINE)  # Horizontal rules
+            slack_content = re.sub(r'\n{3,}', '\n\n', slack_content)  # Multiple newlines
             
             formatted_slack = format_for_slack(slack_content, "analysis")
             
