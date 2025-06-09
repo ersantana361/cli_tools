@@ -103,7 +103,12 @@ def post_to_slack(
     console = Console()
     try:
         link_info = parse_slack_link(slack_link)
-        client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
+        # Try multiple token environment variables
+        slack_token = os.getenv("SLACK_TOKEN") or os.getenv("SLACK_BOT_TOKEN")
+        if not slack_token:
+            raise Exception("Slack token not found. Set SLACK_TOKEN or SLACK_BOT_TOKEN environment variable.")
+        
+        client = WebClient(token=slack_token)
         
         # Apply final formatting
         formatted_content = format_for_slack(content, content_type)
@@ -121,7 +126,7 @@ def post_to_slack(
             thread_ts=link_info["thread_ts"]
         )
         
-        console.print(f"[green]✅ Posted to thread in channel {link_info['channel_id']}[/green]")
+        # Don't print success here - let the caller handle success/failure messaging
         return {
             "channel": link_info["channel_id"],
             "thread_ts": link_info["thread_ts"],
@@ -130,7 +135,13 @@ def post_to_slack(
         }
 
     except SlackApiError as e:
-        error_msg = f"Slack API Error: {e.response['error']}"
+        error_details = e.response.get('error', 'unknown_error')
+        if error_details == 'channel_not_found':
+            error_msg = f"Slack API Error: {error_details} - Check if bot has access to channel {link_info.get('channel_id', 'unknown')}"
+        elif error_details == 'not_authed':
+            error_msg = f"Slack API Error: {error_details} - Check SLACK_TOKEN environment variable"
+        else:
+            error_msg = f"Slack API Error: {error_details}"
         console.print(f"[red]🚫 {error_msg}[/red]")
         return {"error": error_msg, "success": False}
     except Exception as e:
