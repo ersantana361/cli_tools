@@ -179,13 +179,119 @@ The repository is designed for both standalone tool usage and integration into l
 - `GET /health` - Service health check
 
 ### Docker Usage
+
+This repository supports full Docker containerization for both API services and CLI tools.
+
+#### Quick Start
+```bash
+# Build the Docker image
+docker-compose build
+
+# Start the API service
+docker-compose up -d ai-tools-api
+
+# Load convenient Docker aliases
+source scripts/docker-aliases.sh
+
+# Check API health
+ai_api_health
+```
+
+#### Running CLI Tools in Docker
+
+All CLI tools can be run in Docker containers without installing Python dependencies locally.
+
+**Method 1: Using the docker-run.sh wrapper**
+```bash
+# PDF conversion
+./docker-run.sh python ai_tools/main.py convert input.pdf --format enhanced
+
+# GitHub PR analysis
+./docker-run.sh python ai_tools/main.py github https://github.com/owner/repo/pull/123
+
+# YouTube analysis
+./docker-run.sh python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --save-file
+
+# Structured Git workflow
+./docker-run.sh python ngit/main.py
+```
+
+**Method 2: Using Docker aliases (recommended)**
+```bash
+# Load aliases first
+source scripts/docker-aliases.sh
+
+# PDF conversion
+ai_convert_docker input.pdf --format enhanced --clipboard
+
+# GitHub PR analysis
+ai_github_docker https://github.com/owner/repo/pull/123 --target slack
+
+# YouTube analysis
+ai_youtube_docker "https://youtu.be/VIDEO_ID" --save-file --dynamic-tags
+
+# YouTube batch processing
+ai_youtube_docker "URL1" "URL2" "URL3" --save-file
+
+# Structured Git workflow
+ngit_docker
+
+# PR review
+pr_review_docker --pr-url https://github.com/owner/repo/pull/123
+```
+
+#### API Service Management
 ```bash
 # Start API service
-docker-compose up -d
+ai_api_start
 
-# Use CLI client that talks to API
-python scripts/api_client.py convert document.pdf --format enhanced
+# Stop API service
+ai_api_stop
 
-# Check service health
+# View logs
+ai_api_logs
+
+# Restart service
+ai_api_restart
+
+# Rebuild from scratch
+ai_docker_rebuild
+
+# Get shell access
+ai_docker_shell
+
+# Clean up resources
+ai_docker_clean
+```
+
+#### Environment Variables
+Docker containers automatically use environment variables from your shell:
+```bash
+export ANTHROPIC_API_KEY="your_key"
+export DEEPSEEK_API_KEY="your_key"
+export GITHUB_TOKEN_WORK="your_token"
+export YOUTUBE_API_KEY="your_key"
+export SLACK_TOKEN="your_token"
+```
+
+#### Volume Mounts
+The Docker setup includes these volume mounts:
+- `./workspace:/workspace` - For input/output files
+- `~/.claude:/home/appuser/.claude:ro` - Claude configuration (read-only)
+- `.:/app` - Live code updates during development
+- `/tmp/.X11-unix` - X11 socket for clipboard support
+
+#### Troubleshooting
+```bash
+# View all available Docker commands
+ai_docker_help
+
+# Check API health
 curl http://localhost:8000/health
+
+# View container logs
+docker-compose logs -f ai-tools-api
+
+# Rebuild if dependencies changed
+docker-compose build --no-cache
 ```

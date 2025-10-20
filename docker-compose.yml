@@ -1,8 +1,10 @@
 version: '3.8'
 
 services:
+  # API Service - runs the FastAPI server
   ai-tools-api:
     build: .
+    container_name: ai-tools-api
     ports:
       - "8000:8000"
     environment:
@@ -13,10 +15,32 @@ services:
       - SLACK_TOKEN=${SLACK_TOKEN}
     volumes:
       - ./workspace:/workspace
-      - ~/.claude:/home/user/.claude:ro
+      - ~/.claude:/home/appuser/.claude:ro
+      - .:/app
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # CLI Service - for running CLI commands
+  ai-tools-cli:
+    build: .
+    container_name: ai-tools-cli
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GITHUB_TOKEN_WORK=${GITHUB_TOKEN_WORK}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - SLACK_TOKEN=${SLACK_TOKEN}
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - ./workspace:/workspace
+      - ~/.claude:/home/appuser/.claude:ro
+      - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    profiles:
+      - cli
+    # Override default CMD to keep container running
+    command: tail -f /dev/null
