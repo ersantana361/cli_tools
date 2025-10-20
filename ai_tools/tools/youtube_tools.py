@@ -51,7 +51,8 @@ def fetch_youtube_transcript(video_url: str, language: str = "en") -> dict:
             
         # List available transcripts
         console.print(f"[cyan]🔍 Listing available transcripts...[/cyan]")
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        ytt_api = YouTubeTranscriptApi()
+        transcript_list = ytt_api.list(video_id)
         
         # Show all available transcripts
         available_transcripts = list(transcript_list)
@@ -198,8 +199,9 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
              return {"video_title": video_title, "analysis": f"Error: Could not extract video ID from URL: {video_url}"}
 
         console.print(f"[green]Fetching transcript for video ID: {video_id} (Language: {language})...[/green]")
-        
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+
+        ytt_api = YouTubeTranscriptApi()
+        transcript_list = ytt_api.list(video_id)
         
         # Smart transcript selection with multiple fallback strategies
         target_transcript_object = None
@@ -349,7 +351,8 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
         # Try one more fallback - manual transcript retrieval without language preference
         try:
             console.print("[yellow]Attempting final fallback - any available transcript...[/yellow]")
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            ytt_api = YouTubeTranscriptApi()
+            transcript_list = ytt_api.list(video_id)
             available_transcripts = list(transcript_list)
             if available_transcripts:
                 any_transcript = available_transcripts[0]
