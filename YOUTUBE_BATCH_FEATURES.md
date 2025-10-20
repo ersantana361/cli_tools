@@ -27,17 +27,19 @@ Added support for batch processing multiple YouTube videos and automatic markdow
 
 ### Single Video (Clipboard Only - Default)
 ```bash
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --target markdown
+python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID"
 ```
 
 Output: Analysis copied to clipboard, displayed in console
 
 ### Single Video with File Save
 ```bash
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --target markdown --save-file
+python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --save-file
 ```
 
 Output: Creates `Video-Title-Here.md` in current directory + clipboard
+
+💡 **Note**: `--save-file` automatically uses markdown format. You'll see: `📄 Saving to markdown file(s)`
 
 ### Multiple Videos (Requires --save-file)
 ```bash
@@ -45,7 +47,6 @@ python ai_tools/main.py youtube \
   "https://youtu.be/VIDEO_ID_1" \
   "https://youtu.be/VIDEO_ID_2" \
   "https://youtu.be/VIDEO_ID_3" \
-  --target markdown \
   --save-file
 ```
 
@@ -57,7 +58,6 @@ Output: Creates separate `.md` files for each video
 ```bash
 python ai_tools/main.py youtube \
   "https://www.youtube.com/playlist?list=PLAYLIST_ID" \
-  --target markdown \
   --save-file
 ```
 
@@ -68,7 +68,6 @@ Output: Creates `.md` files for all videos in the playlist
 ### Single Video with Custom Filename
 ```bash
 python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" \
-  --target markdown \
   --save-file \
   -o my-custom-name.md
 ```
@@ -76,11 +75,13 @@ python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" \
 ### Advanced Options
 ```bash
 python ai_tools/main.py youtube "URL1" "URL2" \
-  --target markdown \
+  --save-file \
   --dynamic-tags \
   --llm-provider anthropic \
   --language en
 ```
+
+💡 **Note**: `--target markdown` is now automatic when using `--save-file`, so you don't need to specify it!
 
 ## Implementation Details
 
@@ -150,6 +151,12 @@ This will save each video to a separate .md file in the current directory.
 - Console output would be overwhelming for multiple videos
 - Files provide organized, persistent storage for batch results
 - Makes user intent explicit (no accidental file creation)
+
+**Auto-target selection:**
+- When you use `--save-file`, markdown target is automatically selected
+- If you specified `--target slack` with `--save-file`, it will override to markdown with a notification
+- You'll see: `📄 Saving to markdown file(s)` or `📄 Using markdown target for file output (overriding --target slack)`
+- This simplifies usage - just use `--save-file` and the right format is chosen
 
 ## Backward Compatibility
 

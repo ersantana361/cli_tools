@@ -86,8 +86,7 @@ Examples:
         "--target",
         choices=["markdown", "slack"],
         default="markdown",
-        required=True,
-        help="Output target format"
+        help="Output target format (default: markdown, auto-selected when using --save-file)"
     )
     youtube_parser.add_argument(
         "--slack-thread",
@@ -153,6 +152,14 @@ Examples:
                 llm_provider=args.llm_provider
             )
         elif args.command == "youtube":
+            # Auto-select markdown target when --save-file is used
+            if args.save_file:
+                if args.target == "slack":
+                    console.print("[cyan]📄 Using markdown target for file output (overriding --target slack)[/cyan]")
+                    args.target = "markdown"
+                else:
+                    console.print("[cyan]📄 Saving to markdown file(s)[/cyan]")
+
             # Determine if batch or single video processing
             # Handle case where video is a list (could be empty, single, or multiple)
             video_input = args.video if isinstance(args.video, list) else [args.video] if args.video else []

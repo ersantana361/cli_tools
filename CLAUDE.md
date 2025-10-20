@@ -18,16 +18,16 @@ python ai_tools/main.py convert input.pdf --format enhanced --clipboard
 python ai_tools/main.py github https://github.com/owner/repo/pull/123 --target slack --llm-provider anthropic
 
 # YouTube - Single video (clipboard only)
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --target markdown --dynamic-tags
+python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --dynamic-tags
 
-# YouTube - Single video with file save
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --target markdown --save-file --dynamic-tags
+# YouTube - Single video with file save (auto-uses markdown)
+python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --save-file --dynamic-tags
 
-# YouTube - Multiple videos (batch processing - requires --save-file)
-python ai_tools/main.py youtube "URL1" "URL2" "URL3" --target markdown --save-file
+# YouTube - Multiple videos (batch processing - auto-uses markdown)
+python ai_tools/main.py youtube "URL1" "URL2" "URL3" --save-file
 
-# YouTube - Playlist (auto-extracts all videos - requires --save-file)
-python ai_tools/main.py youtube "https://www.youtube.com/playlist?list=PLAYLIST_ID" --target markdown --save-file
+# YouTube - Playlist (auto-extracts all videos, auto-uses markdown)
+python ai_tools/main.py youtube "https://www.youtube.com/playlist?list=PLAYLIST_ID" --save-file
 ```
 
 ### Direct PR Review Tools
