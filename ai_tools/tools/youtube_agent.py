@@ -12,7 +12,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from tools.youtube_tools import analyze_video, generate_video_tags
 from tools.slack_tools import post_to_slack, format_for_slack, extract_youtube_from_slack_thread, extract_youtube_from_slack_channel
-from tools.youtube_utils import extract_video_id
+from tools.youtube_utils import extract_video_id, is_playlist_url, extract_playlist_videos
 from tools.llm_config import get_llm
 
 def get_youtube_url_from_user(console):
@@ -58,6 +58,63 @@ def get_youtube_url_from_user(console):
             console.print(f"[dim]You entered: {video_url}[/dim]")
             continue
 
+def sanitize_filename(title: str, max_length: int = 100) -> str:
+    """
+    Sanitize a video title for use as a filename.
+
+    Args:
+        title: Video title to sanitize
+        max_length: Maximum length for filename (default: 100)
+
+    Returns:
+        Safe filename string
+    """
+    # Remove or replace invalid characters
+    safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
+    # Replace spaces and multiple dashes with single dash
+    safe_title = re.sub(r'[\s_]+', '-', safe_title)
+    # Remove leading/trailing dashes and dots
+    safe_title = safe_title.strip('-. ')
+    # Truncate if too long
+    if len(safe_title) > max_length:
+        safe_title = safe_title[:max_length].rstrip('-. ')
+    return safe_title or "untitled-video"
+
+def save_to_markdown_file(content: str, video_title: str, output_file: Optional[str] = None, console: Optional[Console] = None) -> dict:
+    """
+    Save markdown content to a file.
+
+    Args:
+        content: Markdown content to save
+        video_title: Video title for default filename
+        output_file: Custom output filename (optional)
+        console: Rich console for output (optional)
+
+    Returns:
+        dict with status and filename
+    """
+    if console is None:
+        console = Console()
+
+    try:
+        # Generate filename from title if not provided
+        if output_file:
+            filename = output_file
+        else:
+            safe_title = sanitize_filename(video_title)
+            filename = f"{safe_title}.md"
+
+        # Save to file
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        console.print(f"[green]✅ Saved to: {filename}[/green]")
+        return {"success": True, "filename": filename}
+
+    except Exception as e:
+        console.print(f"[red]❌ Failed to save file: {e}[/red]")
+        return {"success": False, "error": str(e)}
+
 def run_youtube(
     video: Optional[str],
     language: str,
@@ -67,7 +124,9 @@ def run_youtube(
     slack_thread_url: Optional[str] = None,
     slack_channel_name: Optional[str] = None,
     ask_for_url: bool = False,
-    llm_provider: str = "anthropic" # Added llm_provider argument with default
+    llm_provider: str = "anthropic", # Added llm_provider argument with default
+    save_file: bool = False, # New parameter to enable file saving
+    output_file: Optional[str] = None # Custom output filename
 ):
     console = Console()
     try:
@@ -233,17 +292,30 @@ tags:
 ---\n\n"""
             else:
                 metadata = f"# {video_title}\n\n"
-                
+
             final_output = metadata + output_body
+
+            # Save to file if requested
+            if save_file:
+                save_result = save_to_markdown_file(final_output, video_title, output_file, console)
+                if not save_result.get("success"):
+                    console.print("[yellow]⚠️ File save failed, but content is in clipboard[/yellow]")
+
+            # Always copy to clipboard for convenience
             pyperclip.copy(final_output)
             console.print(Panel(f"Video Title: {video_title}", title="Analysis Complete", expand=False))
             console.print(Markdown(final_output))
-            
-            return {
+
+            result = {
                 "video_title": video_title,
                 "status": "success",
                 "content": final_output
             }
+
+            if save_file:
+                result["saved_file"] = save_result.get("filename")
+
+            return result
 
     except ValueError as e:
         console.print(f"[red]🚫 Validation Error: {e}[/red]")
@@ -253,4 +325,151 @@ tags:
     except Exception as e:
         console.print(f"[red]🚫 Error: {e}[/red]")
         traceback.print_exc()
+
+def run_youtube_batch(
+    video_urls: list,
+    language: str = "en",
+    target: str = "markdown",
+    prompt_only: bool = False,
+    dynamic_tags: bool = False,
+    llm_provider: str = "anthropic",
+    save_file: bool = True,
+    output_dir: Optional[str] = None
+) -> dict:
+    """
+    Process multiple YouTube videos in batch.
+
+    Args:
+        video_urls: List of YouTube video URLs
+        language: Transcript language code
+        target: Output format (markdown or slack)
+        prompt_only: Generate prompt without LLM analysis
+        dynamic_tags: Generate dynamic content tags
+        llm_provider: LLM provider to use
+        save_file: Save to file (default: True for batch)
+        output_dir: Output directory for saved files
+
+    Returns:
+        dict with summary of batch processing results
+    """
+    console = Console()
+
+    # Expand playlists to individual videos
+    expanded_urls = []
+    for url in video_urls:
+        if is_playlist_url(url):
+            try:
+                console.print(f"[cyan]📋 Extracting videos from playlist: {url}[/cyan]")
+                playlist_videos = extract_playlist_videos(url)
+                console.print(f"[green]✅ Found {len(playlist_videos)} videos in playlist[/green]")
+                expanded_urls.extend(playlist_videos)
+            except Exception as e:
+                console.print(f"[red]❌ Failed to extract playlist: {e}[/red]")
+                continue
+        else:
+            expanded_urls.append(url)
+
+    if not expanded_urls:
+        console.print("[red]❌ No valid video URLs to process[/red]")
+        return {"status": "failed", "error": "No valid video URLs"}
+
+    console.print(f"\n[bold cyan]Processing {len(expanded_urls)} video(s)...[/bold cyan]\n")
+
+    results = {
+        "total": len(expanded_urls),
+        "successful": 0,
+        "failed": 0,
+        "videos": []
+    }
+
+    # Process each video with progress tracking
+    from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+
+    with Progress(
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("•"),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeRemainingColumn(),
+        console=console
+    ) as progress:
+
+        task = progress.add_task("[cyan]Processing videos...", total=len(expanded_urls))
+
+        for idx, video_url in enumerate(expanded_urls, 1):
+            try:
+                # Update progress description
+                progress.update(task, description=f"[cyan]Video {idx}/{len(expanded_urls)}")
+
+                # Process single video
+                result = run_youtube(
+                    video=video_url,
+                    language=language,
+                    target=target,
+                    prompt_only=prompt_only,
+                    dynamic_tags=dynamic_tags,
+                    llm_provider=llm_provider,
+                    save_file=save_file,
+                    output_file=None  # Auto-generate filename from title
+                )
+
+                if result.get("status") == "success":
+                    results["successful"] += 1
+                    video_result = {
+                        "url": video_url,
+                        "title": result.get("video_title"),
+                        "status": "success"
+                    }
+                    if save_file and "saved_file" in result:
+                        video_result["saved_file"] = result["saved_file"]
+                    results["videos"].append(video_result)
+                else:
+                    results["failed"] += 1
+                    results["videos"].append({
+                        "url": video_url,
+                        "title": result.get("video_title", "Unknown"),
+                        "status": "failed",
+                        "error": result.get("error", "Unknown error")
+                    })
+
+                # Update progress
+                progress.update(task, advance=1)
+
+                # Brief pause between videos to avoid rate limits
+                if idx < len(expanded_urls):
+                    import time
+                    time.sleep(0.5)
+
+            except Exception as e:
+                console.print(f"\n[red]❌ Error processing {video_url}: {e}[/red]\n")
+                results["failed"] += 1
+                results["videos"].append({
+                    "url": video_url,
+                    "status": "failed",
+                    "error": str(e)
+                })
+                progress.update(task, advance=1)
+
+    # Print summary
+    console.print("\n" + "="*60)
+    console.print(Panel.fit(
+        f"[bold]Batch Processing Complete[/bold]\n\n"
+        f"[green]✅ Successful: {results['successful']}[/green]\n"
+        f"[red]❌ Failed: {results['failed']}[/red]\n"
+        f"[cyan]📊 Total: {results['total']}[/cyan]",
+        title="[bold cyan]Summary[/bold cyan]",
+        border_style="cyan"
+    ))
+
+    # Show details of failed videos
+    if results["failed"] > 0:
+        console.print("\n[bold yellow]Failed Videos:[/bold yellow]")
+        for video in results["videos"]:
+            if video["status"] == "failed":
+                console.print(f"  • {video.get('title', video['url'])}")
+                if "error" in video:
+                    console.print(f"    [dim]Error: {video['error']}[/dim]")
+
+    return results
 

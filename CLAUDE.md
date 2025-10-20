@@ -16,7 +16,18 @@ python ai_tools/main.py <command> [options]
 # Available commands:
 python ai_tools/main.py convert input.pdf --format enhanced --clipboard
 python ai_tools/main.py github https://github.com/owner/repo/pull/123 --target slack --llm-provider anthropic
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --dynamic-tags --target markdown
+
+# YouTube - Single video (clipboard only)
+python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --target markdown --dynamic-tags
+
+# YouTube - Single video with file save
+python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --target markdown --save-file --dynamic-tags
+
+# YouTube - Multiple videos (batch processing - requires --save-file)
+python ai_tools/main.py youtube "URL1" "URL2" "URL3" --target markdown --save-file
+
+# YouTube - Playlist (auto-extracts all videos - requires --save-file)
+python ai_tools/main.py youtube "https://www.youtube.com/playlist?list=PLAYLIST_ID" --target markdown --save-file
 ```
 
 ### Direct PR Review Tools
@@ -141,6 +152,9 @@ Tools generate output in multiple formats:
 - Command: `ai_tools/main.py youtube`
 - Features: Transcript extraction, content breakdown, dynamic tag generation
 - Multi-language support with chronological analysis
+- **NEW**: Batch processing for multiple videos or playlists
+- **NEW**: Automatic markdown file generation with sanitized filenames
+- **NEW**: Progress tracking for batch operations
 
 ### Structured Git Operations
 - Tool: `ngit/main.py`

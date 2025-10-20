@@ -1,7 +1,7 @@
 import argparse
 from rich.console import Console
 from tools.github_agent import run_github
-from tools.youtube_agent import run_youtube
+from tools.youtube_agent import run_youtube, run_youtube_batch
 from tools.pdf_converter import run_conversion
 
 def validate_slack_args(args):
@@ -52,19 +52,30 @@ def main():
         help="Analyze YouTube videos",
         description="""YouTube Video Analysis Command
 ---------------------------------
+Single video:
+  youtube "https://youtu.be/VIDEO_ID" --target markdown --save-file
+
+Multiple videos:
+  youtube "URL1" "URL2" "URL3" --target markdown --save-file
+
+Playlist:
+  youtube "https://youtube.com/playlist?list=PLAYLIST_ID" --target markdown --save-file
+
 When using Slack target:
   Required: --slack-thread "https://slack.com/archives/CHANNEL_ID/pTIMESTAMP"
-  
+
 Examples:
-  Markdown: youtube "https://youtu.be/VIDEO_ID" --target markdown
+  Single:   youtube "https://youtu.be/VIDEO_ID" --target markdown --save-file
+  Batch:    youtube "URL1" "URL2" --target markdown --save-file
+  Playlist: youtube "https://youtube.com/playlist?list=..." --target markdown --save-file
   Slack:    youtube "https://youtu.be/VIDEO_ID" --target slack --slack-thread URL
   Auto-extract from thread: youtube --target slack --slack-thread URL
   Auto-extract from channel: youtube --target slack --slack-channel erick-chatbot-room"""
     )
     youtube_parser.add_argument(
         "video",
-        nargs="?",  # Make video argument optional
-        help="YouTube URL (e.g. https://www.youtube.com/watch?v=VIDEO_ID). Optional when using --target slack (will be auto-extracted from thread)"
+        nargs="*",  # Accept zero or more video URLs for batch processing
+        help="YouTube URL(s). Can be: single video URL, multiple video URLs, or playlist URL(s). Optional when using --target slack (will be auto-extracted from thread)"
     )
     youtube_parser.add_argument(
         "--language", 
@@ -108,6 +119,15 @@ Examples:
         default="anthropic", # Default to Anthropic
         help="Specify the LLM provider to use (anthropic or deepseek)"
     )
+    youtube_parser.add_argument(
+        "--save-file",
+        action="store_true",
+        help="Save output to markdown file(s) (default: clipboard only for single video, auto-save for batch)"
+    )
+    youtube_parser.add_argument(
+        "-o", "--output",
+        help="Custom output filename (only for single video, ignored in batch mode)"
+    )
 
 
     args = parser.parse_args()
@@ -133,17 +153,55 @@ Examples:
                 llm_provider=args.llm_provider
             )
         elif args.command == "youtube":
-            run_youtube(
-                video=args.video,
-                language=args.language,
-                target=args.target,
-                prompt_only=args.prompt_only,
-                dynamic_tags=args.dynamic_tags,
-                slack_thread_url=args.slack_thread,
-                slack_channel_name=args.slack_channel,
-                ask_for_url=args.ask_for_url,
-                llm_provider=args.llm_provider # Pass the new argument
-            )
+            # Determine if batch or single video processing
+            # Handle case where video is a list (could be empty, single, or multiple)
+            video_input = args.video if isinstance(args.video, list) else [args.video] if args.video else []
+
+            # Check if we need batch processing (multiple videos or playlist)
+            needs_batch = len(video_input) > 1 or (len(video_input) == 1 and "list=" in video_input[0])
+
+            # Validate: batch processing requires --save-file flag
+            if needs_batch and args.target == "markdown" and not args.save_file:
+                console.print("\n[bold red]⚠️  Batch Processing Requires File Output[/bold red]\n")
+                console.print("You're trying to process multiple videos or a playlist.")
+                console.print("Multiple analyses cannot be output to clipboard only.\n")
+                console.print("[bold cyan]Please add the --save-file flag:[/bold cyan]")
+
+                if len(video_input) > 1:
+                    console.print(f"  python ai_tools/main.py youtube URL1 URL2 ... --target markdown [bold green]--save-file[/bold green]")
+                else:
+                    console.print(f"  python ai_tools/main.py youtube \"PLAYLIST_URL\" --target markdown [bold green]--save-file[/bold green]")
+
+                console.print("\n[dim]This will save each video to a separate .md file in the current directory.[/dim]\n")
+                exit(1)
+
+            if needs_batch and args.target == "markdown":
+                # Batch processing for multiple videos or playlists
+                run_youtube_batch(
+                    video_urls=video_input,
+                    language=args.language,
+                    target=args.target,
+                    prompt_only=args.prompt_only,
+                    dynamic_tags=args.dynamic_tags,
+                    llm_provider=args.llm_provider,
+                    save_file=True  # Always save files in batch mode
+                )
+            else:
+                # Single video processing (or Slack mode)
+                single_video = video_input[0] if video_input else None
+                run_youtube(
+                    video=single_video,
+                    language=args.language,
+                    target=args.target,
+                    prompt_only=args.prompt_only,
+                    dynamic_tags=args.dynamic_tags,
+                    slack_thread_url=args.slack_thread,
+                    slack_channel_name=args.slack_channel,
+                    ask_for_url=args.ask_for_url,
+                    llm_provider=args.llm_provider,
+                    save_file=args.save_file,
+                    output_file=args.output
+                )
 
     except ValueError as e:
         console.print(f"[bold red]Validation Error:[/bold red] {str(e)}")
