@@ -31,3 +31,13 @@ httpx>=0.23.0,<4.0.0
 anyio>=3.6.1,<4.0.0
 
 gitpython==3.1.32
+
+# Docker & Container Management
+docker>=6.0.0
+pyyaml>=6.0
+
+# API Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+requests>=2.31.0

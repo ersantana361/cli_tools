@@ -326,7 +326,7 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
         
         if fetched_transcript_data:
             transcript_entries = [
-                f"{format_time(entry['start'])}: {entry['text']}" 
+                f"{format_time(entry.start)}: {entry.text}" 
                 for entry in fetched_transcript_data
             ]
             transcript_text = "\n".join(transcript_entries)
@@ -356,7 +356,7 @@ def analyze_video(video_url: str, language: str, target: str, prompt_only: bool,
                 console.print(f"[yellow]Using any available transcript: {any_transcript.language_code}[/yellow]")
                 fetched_transcript_data = any_transcript.fetch()
                 transcript_entries = [
-                    f"{format_time(entry['start'])}: {entry['text']}" 
+                    f"{format_time(entry.start)}: {entry.text}" 
                     for entry in fetched_transcript_data
                 ]
                 transcript_text = "\n".join(transcript_entries)

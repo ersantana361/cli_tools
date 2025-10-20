@@ -36,8 +36,12 @@ python ngit/main.py
 
 ### Setup and Dependencies
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Option 1: Docker (Recommended)
+docker-compose up -d                                # Start API service
+source scripts/docker-aliases.sh                   # Load Docker aliases
+
+# Option 2: Local Development
+pip install -r requirements.txt                    # Install dependencies
 
 # Required environment variables
 export ANTHROPIC_API_KEY="your_anthropic_key"      # For Claude LLM
@@ -56,6 +60,12 @@ export SLACK_TOKEN="your_slack_token"              # Slack integration
 - Uses agent-based architecture with LangChain and SmolaAgents
 - Supports multiple LLM providers (Anthropic Claude, DeepSeek)
 - Rich console output with progress tracking
+
+**api/** - FastAPI REST service
+- `server.py` - Main FastAPI application with all endpoints
+- Async processing with background tasks
+- Pydantic models for request/response validation
+- Full compatibility with existing CLI functionality
 
 **pr_reviewer/** - Modular PR review package
 - Object-oriented design with clear separation of concerns
@@ -88,6 +98,13 @@ def get_llm(provider: str = "anthropic"):
 - Rich, Questionary for enhanced CLI experience
 - PyGithub, youtube-transcript-api for API integrations
 - Docling for PDF processing
+- FastAPI, Uvicorn for REST API service
+- Pydantic for data validation
+
+**Docker Configuration**
+- `Dockerfile` - Container setup for API service
+- `docker-compose.yml` - Service orchestration with environment variables
+- `scripts/docker-aliases.sh` - Convenient Docker management aliases
 
 ## Development Patterns
 
@@ -134,7 +151,27 @@ Tools generate output in multiple formats:
 
 The repository is designed for both standalone tool usage and integration into larger AI-powered workflows. Key integration patterns:
 
+- **REST API Service**: FastAPI endpoints for multi-user access and system integration
+- **Docker Containerization**: Easy deployment across different environments
 - **MCP Integration**: Direct Claude Desktop integration via MCP server
 - **API Integration**: GitHub, YouTube, Slack APIs with proper authentication
 - **Multi-Provider LLM**: Seamless switching between Anthropic and DeepSeek
 - **Cross-Tool Workflow**: Tools can be chained together for complex document processing pipelines
+
+### API Endpoints
+- `POST /api/v1/convert/pdf` - PDF to Markdown conversion
+- `POST /api/v1/github/analyze-pr` - GitHub PR analysis
+- `POST /api/v1/youtube/analyze` - YouTube content analysis
+- `GET /health` - Service health check
+
+### Docker Usage
+```bash
+# Start API service
+docker-compose up -d
+
+# Use CLI client that talks to API
+python scripts/api_client.py convert document.pdf --format enhanced
+
+# Check service health
+curl http://localhost:8000/health
+```

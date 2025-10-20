@@ -2,6 +2,16 @@
 
 This repository contains AI-powered CLI tools for document processing, GitHub PR analysis, YouTube content analysis, and structured Git workflows. The tools use an agentic, multi-step approach powered by smolagents, LangChain, and support multiple LLM providers (Anthropic Claude, DeepSeek).
 
+## 🚀 New: API Service Available
+
+The tools are now available as both CLI utilities and a REST API service. Choose your preferred interface:
+
+- **CLI Interface**: Traditional command-line usage (existing functionality)
+- **API Service**: REST endpoints for integration and multi-user access
+- **Docker Support**: Easy deployment with Docker and docker-compose
+
+📖 **[View API Documentation](README_API.md)** for REST API usage and Docker setup.
+
 ## Main CLI Interface (`ai_tools`)
 
 The primary interface is through `ai_tools/main.py`, which provides three main commands: `convert`, `github`, and `youtube`.
@@ -191,7 +201,24 @@ rename_tab "New Tab Name"
 
 ## Setup and Installation
 
-### 1. Create and Activate a Virtual Environment
+### Option 1: Docker (Recommended for API Service)
+
+```bash
+# Clone and start API service
+git clone <repository-url>
+cd cli_tools
+docker-compose up -d
+
+# Check API health
+curl http://localhost:8000/health
+
+# Load Docker aliases
+source scripts/docker-aliases.sh
+```
+
+### Option 2: Local Development
+
+#### 1. Create and Activate a Virtual Environment
 
 ```bash
 python -m venv venv
@@ -199,13 +226,13 @@ source venv/bin/activate  # Linux/macOS
 # venv\Scripts\activate   # Windows
 ```
 
-### 2. Install Dependencies
+#### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Set Up Your Aliases (Recommended)
+#### 3. Set Up Your Aliases (Recommended)
 
 Add all the convenient aliases to your `~/.bashrc` or `~/.zshrc` (see the alias section above for the complete list).
 
