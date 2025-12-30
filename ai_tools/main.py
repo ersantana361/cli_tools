@@ -1,7 +1,11 @@
 import argparse
+import os
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 from tools.github_agent import run_github
 from tools.youtube_agent import run_youtube, run_youtube_batch
+from tools.youtube_utils import extract_playlist_videos, is_playlist_url
 from tools.pdf_converter import run_conversion
 
 def validate_slack_args(args):
@@ -128,6 +132,49 @@ Examples:
         help="Custom output filename (only for single video, ignored in batch mode)"
     )
 
+    # Process Playlist command - simplified interface for playlist batch processing
+    playlist_parser = subparsers.add_parser(
+        "process-playlist",
+        help="Generate summary files for all videos in a YouTube playlist",
+        description="""Process YouTube Playlist
+---------------------------------
+Generate summary markdown files for all videos in a playlist.
+
+Examples:
+  process-playlist "https://youtube.com/playlist?list=PLAYLIST_ID"
+  process-playlist "URL" --output-dir ./summaries/
+  process-playlist "URL" --dry-run"""
+    )
+    playlist_parser.add_argument(
+        "playlist_url",
+        help="YouTube playlist URL"
+    )
+    playlist_parser.add_argument(
+        "--output-dir", "-o",
+        default="./summaries",
+        help="Output directory for markdown files (default: ./summaries)"
+    )
+    playlist_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List videos in playlist without processing"
+    )
+    playlist_parser.add_argument(
+        "--language", "-l",
+        default="en",
+        help="Transcript language code (default: en)"
+    )
+    playlist_parser.add_argument(
+        "--no-tags",
+        action="store_true",
+        help="Disable dynamic tag generation"
+    )
+    playlist_parser.add_argument(
+        "--llm-provider",
+        choices=["anthropic", "deepseek"],
+        default="anthropic",
+        help="LLM provider to use (default: anthropic)"
+    )
 
     args = parser.parse_args()
     console = Console()
@@ -209,6 +256,67 @@ Examples:
                     save_file=args.save_file,
                     output_file=args.output
                 )
+
+        elif args.command == "process-playlist":
+            # Validate playlist URL
+            if not is_playlist_url(args.playlist_url):
+                console.print(Panel(
+                    "[red]Error: The provided URL does not appear to be a YouTube playlist.[/red]\n\n"
+                    "Expected format:\n"
+                    "  https://www.youtube.com/playlist?list=PLAYLIST_ID\n"
+                    "  or a video URL containing list= parameter",
+                    title="[bold red]Invalid URL[/bold red]",
+                    border_style="red"
+                ))
+                exit(1)
+
+            # Extract videos from playlist
+            console.print(f"\n[cyan]Extracting videos from playlist...[/cyan]")
+            video_urls = extract_playlist_videos(args.playlist_url)
+
+            if not video_urls:
+                console.print("[yellow]No videos found in playlist.[/yellow]")
+                exit(0)
+
+            console.print(f"[green]Found {len(video_urls)} videos[/green]\n")
+
+            # Dry run - just list videos
+            if args.dry_run:
+                table = Table(title="Videos in Playlist", show_lines=True)
+                table.add_column("#", style="dim", width=4)
+                table.add_column("Video URL", style="cyan")
+
+                for idx, url in enumerate(video_urls, 1):
+                    table.add_row(str(idx), url)
+
+                console.print(table)
+                console.print(f"\n[dim]Use without --dry-run to process these videos[/dim]")
+            else:
+                # Create output directory
+                output_dir = os.path.abspath(args.output_dir)
+                os.makedirs(output_dir, exist_ok=True)
+                console.print(f"[cyan]Output directory: {output_dir}[/cyan]\n")
+
+                # Change to output directory for file saves
+                original_dir = os.getcwd()
+                os.chdir(output_dir)
+
+                try:
+                    # Process all videos
+                    run_youtube_batch(
+                        video_urls=video_urls,
+                        language=args.language,
+                        target="markdown",
+                        prompt_only=False,
+                        dynamic_tags=not args.no_tags,
+                        llm_provider=args.llm_provider,
+                        save_file=True
+                    )
+
+                    console.print(f"\n[green]Files saved to: {output_dir}[/green]")
+                finally:
+                    # Restore original directory
+                    os.chdir(original_dir)
 
     except ValueError as e:
         console.print(f"[bold red]Validation Error:[/bold red] {str(e)}")

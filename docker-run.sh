@@ -1,7 +1,7 @@
 #!/bin/bash
-# docker-run.sh - Wrapper script to run CLI tools in Docker containers
-# Usage: ./docker-run.sh <command> [args...]
-# Example: ./docker-run.sh ai_tools convert input.pdf --format enhanced
+# docker-run.sh - Wrapper script to run ai_tools CLI in Docker containers
+# Usage: ./docker-run.sh <subcommand> [args...]
+# Example: ./docker-run.sh convert input.pdf --format enhanced
 
 set -e
 
@@ -89,19 +89,24 @@ if [ $# -eq 0 ]; then
     echo "Usage: ./docker-run.sh <command> [args...]"
     echo ""
     echo "Examples:"
-    echo "  ./docker-run.sh python ai_tools/main.py convert input.pdf --format enhanced"
-    echo "  ./docker-run.sh python ai_tools/main.py github https://github.com/owner/repo/pull/123"
-    echo "  ./docker-run.sh python ai_tools/main.py youtube 'https://youtu.be/VIDEO_ID' --save-file"
-    echo "  ./docker-run.sh python ngit/main.py"
+    echo "  ./docker-run.sh convert input.pdf --format enhanced"
+    echo "  ./docker-run.sh github https://github.com/owner/repo/pull/123"
+    echo "  ./docker-run.sh youtube 'https://youtu.be/VIDEO_ID' --save-file"
     echo ""
     exit 1
 fi
 
+# Determine if we should use TTY flags
+DOCKER_FLAGS="--rm"
+if [ -t 0 ] && [ -t 1 ]; then
+    DOCKER_FLAGS="$DOCKER_FLAGS -it"
+fi
+
 # Run the command in Docker
-print_info "Running command in Docker container..."
-docker run --rm -it \
+print_info "Running: python ai_tools/main.py $*"
+docker run $DOCKER_FLAGS \
     $ENV_VARS \
     $VOLUME_MOUNTS \
     -w /app \
     "$IMAGE_NAME" \
-    "$@"
+    python ai_tools/main.py "$@"

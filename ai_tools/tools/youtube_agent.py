@@ -432,6 +432,9 @@ def run_youtube_batch(
                         "status": "failed",
                         "error": result.get("error", "Unknown error")
                     })
+                    # Stop on first failure
+                    progress.update(task, advance=1)
+                    break
 
                 # Update progress
                 progress.update(task, advance=1)
@@ -450,14 +453,19 @@ def run_youtube_batch(
                     "error": str(e)
                 })
                 progress.update(task, advance=1)
+                # Stop on first failure
+                break
 
     # Print summary
     console.print("\n" + "="*60)
+    processed = results["successful"] + results["failed"]
+    stopped_early = processed < results["total"]
+    status_msg = "[yellow]Stopped on failure[/yellow]" if stopped_early else "[bold]Batch Processing Complete[/bold]"
     console.print(Panel.fit(
-        f"[bold]Batch Processing Complete[/bold]\n\n"
+        f"{status_msg}\n\n"
         f"[green]✅ Successful: {results['successful']}[/green]\n"
         f"[red]❌ Failed: {results['failed']}[/red]\n"
-        f"[cyan]📊 Total: {results['total']}[/cyan]",
+        f"[cyan]📊 Processed: {processed}/{results['total']}[/cyan]",
         title="[bold cyan]Summary[/bold cyan]",
         border_style="cyan"
     ))

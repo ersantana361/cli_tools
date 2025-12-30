@@ -20,6 +20,7 @@ PyGithub>=1.55.0
 # AI/ML Components
 langchain>=0.2.0
 langchain-openai>=0.0.1
+langchain-anthropic>=0.1.0
 smolagents
 
 # CLI & UI
