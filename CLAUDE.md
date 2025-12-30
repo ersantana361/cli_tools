@@ -10,24 +10,27 @@ This is a collection of AI-powered CLI tools for document processing, GitHub PR 
 
 ### Main CLI Entry Point
 ```bash
-# Unified CLI interface in ai_tools/
-python ai_tools/main.py <command> [options]
+# Using the 'ai' alias (recommended - see Docker Usage section)
+ai <command> [options]
+
+# Or directly with docker-run.sh
+./docker-run.sh <command> [options]
 
 # Available commands:
-python ai_tools/main.py convert input.pdf --format enhanced --clipboard
-python ai_tools/main.py github https://github.com/owner/repo/pull/123 --target slack --llm-provider anthropic
+ai convert input.pdf --format enhanced --clipboard
+ai github https://github.com/owner/repo/pull/123 --target slack --llm-provider anthropic
 
-# YouTube - Single video (clipboard only)
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --dynamic-tags
+# YouTube - Single video analysis
+ai youtube "https://www.youtube.com/watch?v=VIDEO_ID" --save-file --dynamic-tags
 
-# YouTube - Single video with file save (auto-uses markdown)
-python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --save-file --dynamic-tags
+# YouTube - With specific LLM provider
+ai youtube "https://youtu.be/VIDEO_ID" --save-file --llm-provider deepseek
 
-# YouTube - Multiple videos (batch processing - auto-uses markdown)
-python ai_tools/main.py youtube "URL1" "URL2" "URL3" --save-file
+# YouTube - Process entire playlist (simplified interface)
+ai process-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID" --output-dir ./summaries
 
-# YouTube - Playlist (auto-extracts all videos, auto-uses markdown)
-python ai_tools/main.py youtube "https://www.youtube.com/playlist?list=PLAYLIST_ID" --save-file
+# YouTube - Preview playlist videos without processing
+ai process-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID" --dry-run
 ```
 
 ### Direct PR Review Tools
@@ -67,7 +70,7 @@ export SLACK_TOKEN="your_slack_token"              # Slack integration
 ### Core Modules
 
 **ai_tools/** - Main unified CLI toolkit
-- Entry point: `main.py` with subcommands (convert, github, youtube)
+- Entry point: `main.py` with subcommands (convert, github, youtube, process-playlist)
 - Uses agent-based architecture with LangChain and SmolaAgents
 - Supports multiple LLM providers (Anthropic Claude, DeepSeek)
 - Rich console output with progress tracking
@@ -149,12 +152,12 @@ Tools generate output in multiple formats:
 - Can automatically update PR descriptions
 
 ### YouTube Content Analysis
-- Command: `ai_tools/main.py youtube`
+- Commands: `ai youtube` (single/batch) and `ai process-playlist` (playlists)
 - Features: Transcript extraction, content breakdown, dynamic tag generation
 - Multi-language support with chronological analysis
-- **NEW**: Batch processing for multiple videos or playlists
-- **NEW**: Automatic markdown file generation with sanitized filenames
-- **NEW**: Progress tracking for batch operations
+- Batch processing stops on first failure (fail-fast)
+- Automatic markdown file generation with sanitized filenames
+- Progress tracking for batch operations
 
 ### Structured Git Operations
 - Tool: `ngit/main.py`
@@ -187,81 +190,70 @@ This repository supports full Docker containerization for both API services and 
 # Build the Docker image
 docker-compose build
 
-# Start the API service
-docker-compose up -d ai-tools-api
+# Set up the 'ai' alias (add to ~/.bashrc or ~/.zshrc for persistence)
+alias ai='./docker-run.sh'
 
-# Load convenient Docker aliases
-source scripts/docker-aliases.sh
-
-# Check API health
-ai_api_health
+# Or with absolute path for use from any directory
+alias ai='/path/to/cli_tools/docker-run.sh'
 ```
 
-#### Running CLI Tools in Docker
+#### Using the `ai` Command
 
-All CLI tools can be run in Docker containers without installing Python dependencies locally.
+Once the alias is set, run any command with `ai <subcommand>`:
 
-**Method 1: Using the docker-run.sh wrapper**
 ```bash
-# PDF conversion
-./docker-run.sh python ai_tools/main.py convert input.pdf --format enhanced
+# YouTube - Single video analysis
+ai youtube "https://www.youtube.com/watch?v=VIDEO_ID" --save-file --dynamic-tags
 
-# GitHub PR analysis
-./docker-run.sh python ai_tools/main.py github https://github.com/owner/repo/pull/123
+# YouTube - With specific LLM provider
+ai youtube "https://youtu.be/VIDEO_ID" --save-file --llm-provider deepseek
 
-# YouTube analysis
-./docker-run.sh python ai_tools/main.py youtube "https://youtu.be/VIDEO_ID" --save-file
+# YouTube - Process entire playlist
+ai process-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID" --output-dir ./summaries
 
-# Structured Git workflow
-./docker-run.sh python ngit/main.py
-```
-
-**Method 2: Using Docker aliases (recommended)**
-```bash
-# Load aliases first
-source scripts/docker-aliases.sh
+# YouTube - Dry run to preview playlist videos
+ai process-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID" --dry-run
 
 # PDF conversion
-ai_convert_docker input.pdf --format enhanced --clipboard
+ai convert input.pdf --format enhanced --clipboard
 
 # GitHub PR analysis
-ai_github_docker https://github.com/owner/repo/pull/123 --target slack
-
-# YouTube analysis
-ai_youtube_docker "https://youtu.be/VIDEO_ID" --save-file --dynamic-tags
-
-# YouTube batch processing
-ai_youtube_docker "URL1" "URL2" "URL3" --save-file
-
-# Structured Git workflow
-ngit_docker
-
-# PR review
-pr_review_docker --pr-url https://github.com/owner/repo/pull/123
+ai github https://github.com/owner/repo/pull/123 --target slack
 ```
 
-#### API Service Management
+#### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `ai youtube` | Analyze single/multiple YouTube videos |
+| `ai process-playlist` | Process all videos in a YouTube playlist |
+| `ai convert` | Convert PDF to Markdown |
+| `ai github` | Analyze GitHub PRs |
+
+#### Running Without Alias
+
+If you prefer not to use an alias:
 ```bash
-# Start API service
-ai_api_start
+./docker-run.sh youtube "https://youtu.be/VIDEO_ID" --save-file
+./docker-run.sh process-playlist "PLAYLIST_URL" --output-dir ./summaries
+./docker-run.sh convert input.pdf --format enhanced
+./docker-run.sh github https://github.com/owner/repo/pull/123
+```
 
-# Stop API service
-ai_api_stop
+#### Alternative: Docker Aliases Script
+```bash
+# Load additional Docker management aliases
+source scripts/docker-aliases.sh
 
-# View logs
-ai_api_logs
-
-# Restart service
-ai_api_restart
-
-# Rebuild from scratch
-ai_docker_rebuild
-
-# Get shell access
-ai_docker_shell
-
-# Clean up resources
-ai_docker_clean
+# API management
+ai_api_start      # Start API service
+ai_api_stop       # Stop API service
+ai_api_logs       # View logs
+ai_api_health     # Check health
+ai_api_restart    # Restart service
+ai_docker_rebuild # Rebuild from scratch
+ai_docker_shell   # Get shell access
+ai_docker_clean   # Clean up resources
 ```
 
 #### Environment Variables

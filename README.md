@@ -2,6 +2,17 @@
 
 This repository contains AI-powered CLI tools for document processing, GitHub PR analysis, YouTube content analysis, and structured Git workflows. The tools use an agentic, multi-step approach powered by smolagents, LangChain, and support multiple LLM providers (Anthropic Claude, DeepSeek).
 
+## 📚 Documentation
+
+**[View Full Documentation](docs/README.md)** - Comprehensive guides, command references, and API documentation.
+
+| Quick Links | |
+|-------------|---|
+| [Getting Started](docs/getting-started/README.md) | Installation, setup, configuration |
+| [Commands](docs/commands/README.md) | youtube, process-playlist, convert, github |
+| [Guides](docs/guides/README.md) | YouTube analysis, PR review, batch processing |
+| [API Reference](docs/api/README.md) | REST API endpoints |
+
 ## 🚀 New: API Service Available
 
 The tools are now available as both CLI utilities and a REST API service. Choose your preferred interface:
