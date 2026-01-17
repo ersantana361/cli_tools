@@ -299,11 +299,18 @@ tags:
             if save_file:
                 save_result = save_to_markdown_file(final_output, video_title, output_file, console)
                 if not save_result.get("success"):
-                    console.print("[yellow]⚠️ File save failed, but content is in clipboard[/yellow]")
+                    console.print("[yellow]⚠️ File save failed[/yellow]")
 
-            # Always copy to clipboard for convenience
-            pyperclip.copy(final_output)
+            # Try to copy to clipboard (may fail in Docker/headless environments)
+            try:
+                pyperclip.copy(final_output)
+                clipboard_success = True
+            except Exception:
+                clipboard_success = False
+
             console.print(Panel(f"Video Title: {video_title}", title="Analysis Complete", expand=False))
+            if not clipboard_success:
+                console.print("[yellow]⚠️ Clipboard not available (running in Docker/headless environment)[/yellow]")
             console.print(Markdown(final_output))
 
             result = {

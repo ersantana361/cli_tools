@@ -48,6 +48,9 @@ fi
 # Get the directory of this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Get user's current working directory (where they ran the command from)
+USER_PWD="$(pwd)"
+
 # Prepare environment variables
 ENV_VARS=""
 if [ -n "$ANTHROPIC_API_KEY" ]; then
@@ -70,7 +73,8 @@ if [ -n "$DISPLAY" ]; then
 fi
 
 # Prepare volume mounts
-VOLUME_MOUNTS="-v $SCRIPT_DIR:/app -v $SCRIPT_DIR/workspace:/workspace"
+# Mount app code at /app and user's current directory at /workdir
+VOLUME_MOUNTS="-v $SCRIPT_DIR:/app -v $USER_PWD:/workdir"
 
 # Mount .claude directory if it exists
 if [ -d "$HOME/.claude" ]; then
@@ -103,10 +107,11 @@ if [ -t 0 ] && [ -t 1 ]; then
 fi
 
 # Run the command in Docker
-print_info "Running: python ai_tools/main.py $*"
+# Working directory is /workdir (user's PWD), code is at /app
+print_info "Running: python /app/ai_tools/main.py $*"
 docker run $DOCKER_FLAGS \
     $ENV_VARS \
     $VOLUME_MOUNTS \
-    -w /app \
+    -w /workdir \
     "$IMAGE_NAME" \
-    python ai_tools/main.py "$@"
+    python /app/ai_tools/main.py "$@"

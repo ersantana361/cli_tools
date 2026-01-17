@@ -295,7 +295,7 @@ Examples:
                 # Create output directory
                 output_dir = os.path.abspath(args.output_dir)
                 os.makedirs(output_dir, exist_ok=True)
-                console.print(f"[cyan]Output directory: {output_dir}[/cyan]\n")
+                console.print(f"[cyan]Output directory: {args.output_dir}[/cyan]\n")
 
                 # Change to output directory for file saves
                 original_dir = os.getcwd()
@@ -313,7 +313,7 @@ Examples:
                         save_file=True
                     )
 
-                    console.print(f"\n[green]Files saved to: {output_dir}[/green]")
+                    console.print(f"\n[green]Files saved to: {args.output_dir}[/green]")
                 finally:
                     # Restore original directory
                     os.chdir(original_dir)
